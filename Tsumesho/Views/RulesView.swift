@@ -389,8 +389,9 @@ private struct HintIllustration: View {
 private struct ScoreIllustration: View {
     @State private var streak = 1
 
+    /// 「次の得点」の倍率。次に解くと streak + 1 連勝目になる（Session.nextStreakMultiplier と同じ）。
     /// 実際のスコアと同じ式で求める（Score.swift）。式を変えたときに、説明と食い違わないように
-    private var multiplier: Double { ScoreGain.streakMultiplier(for: streak) }
+    private var multiplier: Double { ScoreGain.streakMultiplier(for: streak + 1) }
 
     var body: some View {
         VStack(spacing: 16) {
