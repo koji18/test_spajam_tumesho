@@ -237,8 +237,11 @@ struct RecordsView: View {
 /// 設定
 struct SettingsView: View {
     let onShowTutorial: () -> Void
+    /// 記録を消したあと。ホームに戻す
+    let onReset: () -> Void
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmsReset = false
 
     var body: some View {
         @Bindable var session = session
@@ -293,11 +296,24 @@ struct SettingsView: View {
                 } footer: {
                     Text("「最初の演出」は、1問目を詰ませた瞬間に、普通の見た目からネオンの見た目に変わる演出です")
                 }
+                Section {
+                    Button("記録をすべて消す", role: .destructive) { confirmsReset = true }
+                } footer: {
+                    Text("レーティング・スコア・連勝・入門の星・修行の問題・設定を消して、はじめて起動したときに戻します")
+                }
             }
             .scrollContentBackground(.hidden)
             .background(NeonBackdrop())
             .navigationTitle("設定")
             .toolbar { Button("閉じる") { dismiss() } }
+            .confirmationDialog("記録をすべて消しますか？", isPresented: $confirmsReset, titleVisibility: .visible) {
+                Button("すべて消す", role: .destructive) {
+                    session.resetAll()
+                    onReset()
+                }
+            } message: {
+                Text("消した記録は元に戻せません")
+            }
         }
     }
 }

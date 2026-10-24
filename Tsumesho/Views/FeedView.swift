@@ -149,7 +149,11 @@ struct FeedView: View {
         }
         .sheet(isPresented: $showRecords) { RecordsView() }
         .sheet(isPresented: $showSettings) {
-            SettingsView { showSettings = false; onHome() }
+            SettingsView {
+                showSettings = false; onHome()
+            } onReset: {
+                showSettings = false; onHome()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { Haptics.stop(); Sound.stop() }

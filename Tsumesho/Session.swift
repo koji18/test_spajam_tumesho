@@ -94,6 +94,28 @@ final class Session {
         displayedScore = score
     }
 
+    /// 設定の「記録をすべて消す」。成績・入門の星・修行の問題・設定を消し、はじめて起動したときと同じにする。
+    /// 普通の見た目に戻り、入門から始まる
+    func resetAll() {
+        scoreRevealID = UUID()
+        mode = .tutorial
+        boardSize = .full
+        hapticsOn = true
+        soundVolume = 0.8
+        musicVolume = 0.6
+        tutorialCleared = false
+        tutorialStars = Array(repeating: 0, count: TutorialStage.all.count)
+        rating = 1500
+        streak = 0
+        bestStreak = 0
+        solvedTotal = 0
+        timeTrialBest = 0
+        totalScore = 0
+        displayedScore = 0
+        scorePopup = nil
+        practice.reset()
+    }
+
     /// 正解したとき。連勝と正解数を増やし、レーティングを上げ、スコアを累計に足して、得た点を返す。
     /// レーティングは 1 手詰めで +12、3 手詰めで +20。ヒントを 1 段使うごとに 5 減らす（最低 +2）。
     /// 間違えたときは recordMiss（レーティング -10、連勝を 0 に戻す）
