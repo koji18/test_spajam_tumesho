@@ -22,7 +22,7 @@ struct TopBar: View {
                         .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 10)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("モード：\(session.mode == .normal ? "ノーマル" : "タイムトライアル")")
+                .accessibilityLabel("モード：\(session.mode.label)")
                 .accessibilityHint("メニューを開きます")
 
                 Spacer()

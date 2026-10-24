@@ -13,6 +13,15 @@ enum PlayMode: String {
         case .timeTrial: "TIME TRIAL"
         }
     }
+
+    /// 読み上げなどに使う日本語の名前
+    var label: String {
+        switch self {
+        case .tutorial: "チュートリアル"
+        case .normal: "ノーマル"
+        case .timeTrial: "タイムトライアル"
+        }
+    }
 }
 
 // 遊び方の設定と成績。問題のページをまたいで共有し、次に起動したときも残す
