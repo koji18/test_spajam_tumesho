@@ -199,7 +199,7 @@ struct IntroPage: View {
     private var modeNote: some View {
         let text: String = switch session.mode {
         case .tutorial:
-            session.tutorialDone ? "7段階を修了ずみ。復習もできます" : "7段階で学ぶ。いま \(min(session.tutorialStage, 7)) / 7 段を修了"
+            session.tutorialDone ? "7段階を修了ずみ。いつでも復習できます" : "7段階で学ぶ。いま \(session.tutorialSolved) / 7 段を修了"
         case .normal:
             "自分のペースで、ずっと解ける"
         case .timeTrial:
@@ -213,7 +213,7 @@ struct IntroPage: View {
     private var startCaption: String {
         switch session.mode {
         case .tutorial:
-            session.tutorialDone ? "入門をもう一度" : (session.tutorialStage > 0 ? "第\(session.tutorialStage + 1)段から" : "はじめから")
+            session.tutorialDone ? "入門をもう一度" : (session.tutorialSolved > 0 ? "第\(session.tutorialNext + 1)段から" : "はじめから")
         default:
             session.solvedTotal > 0 ? "つづきから" : "はじめから"
         }

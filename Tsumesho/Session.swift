@@ -63,9 +63,17 @@ final class Session {
     // 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
-    // 入門チュートリアル。次に挑む段（0 から数える）と、最後まで終えたか
-    var tutorialStage: Int { didSet { store.set(tutorialStage, forKey: "tutorialStage") } }
-    var tutorialDone: Bool { didSet { store.set(tutorialDone, forKey: "tutorialDone") } }
+    // 入門チュートリアルの、段ごとの星（0 はまだ解いていない）。段はいつでも好きな順に行き来できる
+    private(set) var tutorialStars: [Int] { didSet { store.set(tutorialStars, forKey: "tutorialStars") } }
+    var tutorialSolved: Int { tutorialStars.filter { $0 > 0 }.count }
+    var tutorialDone: Bool { tutorialSolved >= TutorialStage.all.count }
+    // 次に挑む段（最初の未クリアの段。全部終えていれば最初）
+    var tutorialNext: Int { tutorialStars.firstIndex(of: 0) ?? 0 }
+
+    func recordTutorial(stage: Int, stars: Int) {
+        guard tutorialStars.indices.contains(stage) else { return }
+        tutorialStars[stage] = max(tutorialStars[stage], stars)
+    }
 
     var palette: Palette { tutorialCleared ? .neon : .classic }
 
@@ -84,8 +92,8 @@ final class Session {
         // はじめて起動したときは、入門から始める。すでに遊んでいる人はノーマルのまま
         let played = store.integer(forKey: "solvedTotal") > 0
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? (played ? .normal : .tutorial)
-        tutorialStage = store.integer(forKey: "tutorialStage")
-        tutorialDone = store.bool(forKey: "tutorialDone")
+        let saved = store.array(forKey: "tutorialStars") as? [Int] ?? []
+        tutorialStars = (0..<TutorialStage.all.count).map { $0 < saved.count ? saved[$0] : 0 }
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
         tutorialCleared = store.bool(forKey: "tutorialCleared")

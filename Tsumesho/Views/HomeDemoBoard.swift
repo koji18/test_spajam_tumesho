@@ -236,9 +236,11 @@ struct HomeDemoBoard: View {
 
 // 詰んだ瞬間の爆発。紙の閃光、集中線、三重の衝撃波、金の光、紙吹雪と金箔を、経過時間だけで描く。
 // 盤からはみ出して舞うので、描く範囲は盤より広く取る
-private struct MateBurst: View {
+struct MateBurst: View {
     let start: Date?
     let side: CGFloat
+    // 入門チュートリアル用の、控えめな版。集中線と閃光をなくし、衝撃波と紙吹雪を減らす
+    var light = false
 
     var body: some View {
         TimelineView(.animation(paused: start == nil)) { timeline in
@@ -247,9 +249,9 @@ private struct MateBurst: View {
                 guard t >= 0 else { return }
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
                 bloom(&ctx, c, t)
-                rays(&ctx, c, t)
+                if !light { rays(&ctx, c, t) }
                 rings(&ctx, c, t)
-                flash(&ctx, c, t)
+                if !light { flash(&ctx, c, t) }
                 confetti(&ctx, c, t)
             }
         }
@@ -294,7 +296,7 @@ private struct MateBurst: View {
 
     // 朱・墨・金の衝撃波を少しずつずらして広げる
     private func rings(_ ctx: inout GraphicsContext, _ c: CGPoint, _ t: Double) {
-        let colors: [Color] = [Washi.vermilion, Washi.ink, Washi.kaya]
+        let colors: [Color] = light ? [Washi.vermilion, Washi.kaya] : [Washi.vermilion, Washi.ink, Washi.kaya]
         for (i, color) in colors.enumerated() {
             let local = t - Double(i) * 0.09
             guard local > 0, local < 0.8 else { continue }
@@ -319,7 +321,7 @@ private struct MateBurst: View {
         guard t < 3.1 else { return }
         let fade = t > 2.3 ? max(0, 1 - (t - 2.3) / 0.8) : 1
         let palette: [Color] = [Washi.vermilion, Washi.kaya, Color.white, Washi.vermilion, Washi.ink, Washi.kaya]
-        for i in 0..<84 {
+        for i in 0..<(light ? 40 : 84) {
             let angle = -Double.pi * (0.06 + 0.88 * rnd(i, 4))
             let speed = side * (0.7 + 1.5 * rnd(i, 5))
             let sway = sin(t * (3 + rnd(i, 6) * 3) + Double(i)) * side * 0.03

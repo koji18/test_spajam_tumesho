@@ -30,7 +30,7 @@ struct RootView: View {
     var body: some View {
         ZStack {
             if playing && session.mode == .tutorial {
-                TutorialView(startAt: session.tutorialDone ? 0 : session.tutorialStage) {
+                TutorialView(startAt: session.tutorialNext) {
                     playing = false
                 } onFinish: {
                     // 修了したらノーマルで実戦へ。1 問目を解いているあいだに、作り置きも始めておく

@@ -2,15 +2,15 @@ import SwiftUI
 import UIKit
 
 // 入門チュートリアル。詰将棋の考え方を 7 段階で覚える。落ち着いた和紙の見た目で、
-// 1 段ごとに「説明 → 解く → 解説」と進み、解けるたびに朱の印と星がつく。派手な演出はしない
+// 1 段ごとに「説明 → 解く → 解説」と進み、解けるたびに朱の印と星がつく。派手な演出はしない。
+// 7 段は縦のスワイプでも、上の駒の印をタップしても、いつでも好きな段へ行き来できる
 struct TutorialView: View {
     let startAt: Int
     let onHome: () -> Void
     let onFinish: () -> Void
 
     @Environment(Session.self) private var session
-    @State private var index: Int
-    @State private var stars: [Int] = []
+    @State private var current: Int?
     @State private var finished = false
 
     private let stages = TutorialStage.all
@@ -19,30 +19,58 @@ struct TutorialView: View {
         self.startAt = startAt
         self.onHome = onHome
         self.onFinish = onFinish
-        _index = State(initialValue: min(max(0, startAt), TutorialStage.all.count - 1))
+        _current = State(initialValue: 0)
     }
+
+    private var index: Int { current ?? 0 }
 
     var body: some View {
         ZStack {
             PaperBackground()
             if finished {
-                TutorialFinish(stages: stages, stars: stars, onFinish: onFinish, onRestart: restart)
+                TutorialFinish(stages: stages, stars: session.tutorialStars, onFinish: onFinish, onRestart: restart)
                     .transition(.opacity)
             } else {
                 VStack(spacing: 0) {
                     header
-                    StagePage(stage: stages[index], total: stages.count) { earned in
-                        advance(earned)
-                    }
-                    .id(index)
-                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                            removal: .move(edge: .leading).combined(with: .opacity)))
+                    pages
                 }
             }
         }
         .environment(\.palette, .classic)
-        .animation(.easeInOut(duration: 0.35), value: index)
         .animation(.easeInOut(duration: 0.4), value: finished)
+        // 開始位置は、最初のレイアウトのあとで指定し直さないとスクロールされない
+        .task {
+            let target = min(max(0, startAt), stages.count - 1)
+            guard target > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(60))
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { current = target }
+        }
+    }
+
+    // 縦に 7 段を並べ、1 段ずつ止めながらスクロールする
+    private var pages: some View {
+        ScrollView(.vertical) {
+            VStack(spacing: 0) {
+                ForEach(Array(stages.enumerated()), id: \.offset) { i, stage in
+                    StagePage(stage: stage, total: stages.count,
+                              previousStars: session.tutorialStars[i],
+                              nextLabel: nextLabel(after: i),
+                              onSolved: { earned in session.recordTutorial(stage: i, stars: earned) },
+                              onNext: { goNext(from: i) })
+                        .containerRelativeFrame([.horizontal, .vertical])
+                        .id(i)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollPosition(id: $current)
+        .scrollTargetBehavior(.paging)
+        .scrollIndicators(.hidden)
+        // スクロールの中身は下の安全領域の下にも続くので、はみ出して見える次の段の上端を切り落とす
+        .clipped()
     }
 
     // MARK: 上の段
@@ -58,49 +86,59 @@ struct TutorialView: View {
             }
             .buttonStyle(.plain)
             Spacer()
-            HStack(spacing: 7) {
+            HStack(spacing: 4) {
                 ForEach(0..<stages.count, id: \.self) { i in
                     pip(i)
                 }
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(stages.count)段階中、第\(index + 1)段")
         }
         .padding(.horizontal, 24)
         .padding(.top, 8)
     }
 
-    // 進み具合を駒の形で出す。終えた段は朱、いまの段は墨の縁取り
+    // 駒の形の印。解いた段は朱、いまの段は墨の縁取り。タップでその段へ飛ぶ
     private func pip(_ i: Int) -> some View {
-        let done = i < index || i < stars.count
-        let current = i == index
-        return KomaShape()
-            .fill(done ? Washi.vermilion : Color.clear)
-            .overlay(KomaShape().stroke(current ? Washi.ink : Washi.kayaEdge.opacity(0.55), lineWidth: current ? 2 : 1))
-            .frame(width: 15, height: 17)
-            .scaleEffect(current ? 1.18 : 1)
-            .animation(.spring(response: 0.35, dampingFraction: 0.55), value: done)
+        let done = session.tutorialStars[i] > 0
+        let isCurrent = i == index
+        return Button {
+            if session.hapticsOn { UISelectionFeedbackGenerator().selectionChanged() }
+            withAnimation(.easeInOut(duration: 0.4)) { current = i }
+        } label: {
+            KomaShape()
+                .fill(done ? Washi.vermilion : Color.clear)
+                .overlay(KomaShape().stroke(isCurrent ? Washi.ink : Washi.kayaEdge.opacity(0.55), lineWidth: isCurrent ? 2 : 1))
+                .frame(width: 15, height: 17)
+                .scaleEffect(isCurrent ? 1.18 : 1)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+                .animation(.spring(response: 0.35, dampingFraction: 0.55), value: done)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("第\(i + 1)段" + (done ? "、解いた" : ""))
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 
     // MARK: 進行
 
-    private func advance(_ earned: Int) {
-        // 途中から始めたときは、前の段の星はないものとして数える
-        while stars.count < index { stars.append(0) }
-        if stars.count == index { stars.append(earned) } else { stars[index] = max(stars[index], earned) }
-        session.tutorialStage = max(session.tutorialStage, index + 1)
-        if index + 1 >= stages.count {
-            session.tutorialDone = true
+    // 最後の段では、全部解けていれば「修了へ」、まだなら最初の未クリアの段へ戻る
+    private func nextLabel(after i: Int) -> String {
+        guard i == stages.count - 1 else { return "つぎの段へ" }
+        return session.tutorialDone ? "修了へ" : "解いていない段へ"
+    }
+
+    private func goNext(from i: Int) {
+        if i + 1 < stages.count {
+            withAnimation(.easeInOut(duration: 0.45)) { current = i + 1 }
+        } else if session.tutorialDone {
             finished = true
         } else {
-            index += 1
+            withAnimation(.easeInOut(duration: 0.45)) { current = session.tutorialNext }
         }
     }
 
     private func restart() {
-        stars = []
-        session.tutorialStage = 0
-        index = 0
+        current = 0
         finished = false
     }
 }
@@ -110,7 +148,10 @@ struct TutorialView: View {
 private struct StagePage: View {
     let stage: TutorialStage
     let total: Int
-    let onNext: (_ stars: Int) -> Void
+    let previousStars: Int
+    let nextLabel: String
+    let onSolved: (_ stars: Int) -> Void
+    let onNext: () -> Void
 
     @Environment(Session.self) private var session
     @State private var game: Game
@@ -118,10 +159,18 @@ private struct StagePage: View {
     @State private var cleared = false
     @State private var stampScale: CGFloat = 2.2
     @State private var stampOpacity = 0.0
+    @State private var burstStart: Date?
+    @State private var sealScale: CGFloat = 2.4
+    @State private var sealOpacity = 0.0
+    @State private var bump: CGFloat = 0
 
-    init(stage: TutorialStage, total: Int, onNext: @escaping (_ stars: Int) -> Void) {
+    init(stage: TutorialStage, total: Int, previousStars: Int, nextLabel: String,
+         onSolved: @escaping (_ stars: Int) -> Void, onNext: @escaping () -> Void) {
         self.stage = stage
         self.total = total
+        self.previousStars = previousStars
+        self.nextLabel = nextLabel
+        self.onSolved = onSolved
         self.onNext = onNext
         _game = State(initialValue: Game(problem: stage.problem))
     }
@@ -132,7 +181,7 @@ private struct StagePage: View {
                 VStack(alignment: .leading, spacing: 14) {
                     titleBlock
                     lessonCard
-                    BoardView(game: game)
+                    boardWithEffect
                     statusLine
                     handRow
                     if case .failed(let answer) = game.status { failCard(answer) }
@@ -142,6 +191,7 @@ private struct StagePage: View {
                 .padding(.bottom, 12)
             }
             .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
             bottomBar
         }
         .onAppear { game.start() }
@@ -168,6 +218,68 @@ private struct StagePage: View {
         withAnimation(.easeOut(duration: 0.2)) { cleared = true }
         stampOpacity = 1
         withAnimation(.spring(response: 0.25, dampingFraction: 0.5).delay(0.15)) { stampScale = 1 }
+        onSolved(earnedStars)
+        celebrate()
+    }
+
+    // 解けた瞬間の、少しだけ派手な演出。盤の上に朱の落款が押され、紙吹雪が舞う
+    private func celebrate() {
+        burstStart = Date()
+        sealOpacity = 1
+        sealScale = 2.4
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.5)) { sealScale = 1 }
+        if session.hapticsOn { UIImpactFeedbackGenerator(style: .rigid).impactOccurred() }
+        Task {
+            for value: CGFloat in [5, -2, 1, 0] {
+                withAnimation(.easeOut(duration: 0.05)) { bump = value }
+                try? await Task.sleep(for: .milliseconds(55))
+            }
+            try? await Task.sleep(for: .milliseconds(1100))
+            withAnimation(.easeIn(duration: 0.3)) { sealOpacity = 0 }
+        }
+    }
+
+    private var boardWithEffect: some View {
+        BoardView(game: game)
+            .offset(y: bump)
+            .overlay {
+                GeometryReader { geo in
+                    ZStack {
+                        MateBurst(start: burstStart, side: geo.size.width, light: true)
+                        seal(side: geo.size.width)
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                }
+                .allowsHitTesting(false)
+            }
+    }
+
+    private func seal(side: CGFloat) -> some View {
+        let size = side * 0.36
+        return ZStack {
+            RoundedRectangle(cornerRadius: 7).fill(Washi.vermilion)
+            RoundedRectangle(cornerRadius: 4).inset(by: 6).stroke(Washi.paper.opacity(0.8), lineWidth: 2)
+            Text("詰")
+                .font(Theme.brush(size * 0.7))
+                .foregroundStyle(Washi.paper)
+        }
+        .frame(width: size, height: size)
+        .rotationEffect(.degrees(-9))
+        .scaleEffect(sealScale)
+        .opacity(sealOpacity)
+        .shadow(color: Washi.vermilion.opacity(0.35), radius: 8, y: 4)
+    }
+
+    // もう一度、はじめから解く。前に解いた星は残る
+    private func retry() {
+        game = Game(problem: stage.problem)
+        game.start()
+        burstStart = nil
+        sealOpacity = 0
+        misses = 0
+        cleared = false
+        stampOpacity = 0
+        stampScale = 2.2
     }
 
     // MARK: 見出しと説明
@@ -184,6 +296,16 @@ private struct StagePage: View {
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
                     .background(RoundedRectangle(cornerRadius: 2).fill(Washi.inkSoft))
+                if previousStars > 0 {
+                    HStack(spacing: 1) {
+                        ForEach(0..<3, id: \.self) { i in
+                            Image(systemName: i < previousStars ? "star.fill" : "star")
+                                .font(.system(size: 10))
+                                .foregroundStyle(i < previousStars ? Washi.vermilion : Washi.kayaEdge.opacity(0.45))
+                        }
+                    }
+                    .accessibilityLabel("解いた。星\(previousStars)")
+                }
             }
             Text(stage.title)
                 .font(Theme.koma(30))
@@ -328,18 +450,23 @@ private struct StagePage: View {
     @ViewBuilder
     private var bottomBar: some View {
         if cleared {
-            Button {
-                if session.hapticsOn { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-                onNext(earnedStars)
-            } label: {
-                Text(stage.number == total ? "修了へ" : "つぎの段へ")
-                    .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(Washi.paper)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Washi.vermilion))
+            VStack(spacing: 8) {
+                Button {
+                    if session.hapticsOn { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+                    onNext()
+                } label: {
+                    Text(nextLabel)
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(Washi.paper)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Washi.vermilion))
+                }
+                .buttonStyle(.plain)
+                Button("もう一度解く", action: retry)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Washi.inkSoft)
             }
-            .buttonStyle(.plain)
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
