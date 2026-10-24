@@ -8,6 +8,7 @@ struct TsumeshoApp: App {
     /// 起動時に、同梱したフォントを登録する
     init() {
         Theme.registerFonts()
+        Sound.prepare()
     }
 
     var body: some Scene {

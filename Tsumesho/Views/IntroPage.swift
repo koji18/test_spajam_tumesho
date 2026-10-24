@@ -39,7 +39,10 @@ struct IntroPage: View {
 
             Spacer(minLength: 0)
 
-            Button(action: onStart) {
+            Button {
+                Sound.playPick(volume: session.soundVolume)
+                onStart()
+            } label: {
                 Text("はじめる")
                     .font(.system(size: 18, weight: .bold))
                     .frame(maxWidth: .infinity)

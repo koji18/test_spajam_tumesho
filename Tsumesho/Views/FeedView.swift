@@ -153,6 +153,7 @@ struct FeedView: View {
     /// 演出を出し、少し見せてから下の列だけを次の問題へスライドさせ、最後に演出を消す
     private func celebrate(_ problem: Problem, seconds: Int, tesuji: String?) {
         Haptics.mate(enabled: session.hapticsOn)
+        Sound.playMate(volume: session.soundVolume)
         let c = Celebration(problem: problem, seconds: seconds, tesuji: tesuji)
         withAnimation(.easeOut(duration: 0.15)) { celebration = c }
         Task {
