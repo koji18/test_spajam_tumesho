@@ -82,46 +82,51 @@ struct BoardView: View {
     var body: some View {
         let files = Array(game.visibleFiles.reversed())  // 左から ９ ８ … １（5×5 では切り出した 5 筋）
         let ranks = Array(game.visibleRanks)
+        // 筋と段の番号は、マスと同じ座標で位置を決めて置く。
+        // 番号の行とマスの行を別々に並べると、スワイプ中などに番号だけがずれることがあるため
         GeometryReader { geo in
             let labelSize: CGFloat = 18
             let cell = (geo.size.width - labelSize) / CGFloat(files.count)
-            VStack(spacing: 2) {
-                HStack(spacing: 0) {
-                    ForEach(files, id: \.self) { f in
-                        Text(Notation.fileLabel(f)).frame(width: cell)
-                    }
-                    Spacer().frame(width: labelSize)
+            let gridWidth = cell * CGFloat(files.count)
+            let gridHeight = cell * CGFloat(ranks.count)
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(files.enumerated()), id: \.element) { i, f in
+                    // 筋の番号は半角にして Orbitron で出す（全角の数字は Orbitron になく、別のフォントになる）
+                    Text(verbatim: "\(f)")
+                        .font(Theme.number(files.count > 5 ? 11 : 13, weight: .medium))
+                        .foregroundStyle(palette.coordinate)
+                        .fixedSize()
+                        .position(x: (CGFloat(i) + 0.5) * cell, y: labelSize / 2)
                 }
-                .font(Theme.display(files.count > 5 ? 11 : 13, weight: .medium))
-                .foregroundStyle(palette.coordinate)
 
-                HStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        ForEach(ranks, id: \.self) { r in
-                            HStack(spacing: 0) {
-                                ForEach(files, id: \.self) { f in
-                                    cellView(Square.index(file: f, rank: r), size: cell)
-                                }
+                VStack(spacing: 0) {
+                    ForEach(ranks, id: \.self) { r in
+                        HStack(spacing: 0) {
+                            ForEach(files, id: \.self) { f in
+                                cellView(Square.index(file: f, rank: r), size: cell)
                             }
                         }
                     }
-                    .background(palette.boardFill)
-                    .shadow(color: .white.opacity(0.18 * palette.glow), radius: 16)
-                    .overlay { stars(files: files, ranks: ranks, cell: cell) }
-                    .overlay(alignment: .top) { edge(horizontal: true) }
-                    .overlay(alignment: .bottom) { edge(horizontal: true) }
-                    .overlay(alignment: .leading) { edge(horizontal: false) }
-                    .overlay(alignment: .trailing) { edge(horizontal: false) }
+                }
+                .frame(width: gridWidth, height: gridHeight)
+                .background(palette.boardFill)
+                .shadow(color: .white.opacity(0.18 * palette.glow), radius: 16)
+                .overlay { stars(files: files, ranks: ranks, cell: cell) }
+                .overlay(alignment: .top) { edge(horizontal: true) }
+                .overlay(alignment: .bottom) { edge(horizontal: true) }
+                .overlay(alignment: .leading) { edge(horizontal: false) }
+                .overlay(alignment: .trailing) { edge(horizontal: false) }
+                .offset(y: labelSize)
 
-                    VStack(spacing: 0) {
-                        ForEach(ranks, id: \.self) { r in
-                            Text(Notation.rankLabel(r)).frame(width: labelSize, height: cell)
-                        }
-                    }
-                    .font(.system(size: files.count > 5 ? 10 : 11, weight: .bold))
-                    .foregroundStyle(palette.coordinate)
+                ForEach(Array(ranks.enumerated()), id: \.element) { j, r in
+                    Text(Notation.rankLabel(r))
+                        .font(.system(size: files.count > 5 ? 10 : 11, weight: .bold))
+                        .foregroundStyle(palette.coordinate)
+                        .fixedSize()
+                        .position(x: gridWidth + labelSize / 2, y: labelSize + (CGFloat(j) + 0.5) * cell)
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
         .aspectRatio(1, contentMode: .fit)
     }
