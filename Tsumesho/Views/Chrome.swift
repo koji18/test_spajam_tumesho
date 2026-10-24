@@ -85,6 +85,7 @@ struct MenuPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             row(title: "ホーム", selected: false, action: onHome) { Image(systemName: "house") }
+            row(title: "チュートリアル", selected: session.mode == .tutorial, action: { onMode(.tutorial) }) { ModeIcon(mode: .tutorial, size: 20) }
             row(title: "ノーマル", selected: session.mode == .normal, action: { onMode(.normal) }) { ModeIcon(mode: .normal, size: 20) }
             row(title: "タイムトライアル", selected: session.mode == .timeTrial, action: { onMode(.timeTrial) }) { ModeIcon(mode: .timeTrial, size: 20) }
             row(title: "記録", selected: false, action: onRecords) { Image(systemName: "chart.bar") }
