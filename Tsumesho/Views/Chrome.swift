@@ -48,13 +48,15 @@ struct TopBar: View {
     }
 }
 
-// モードのアイコン。ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
+// モードのアイコン。入門は学帽、ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
 struct ModeIcon: View {
     let mode: PlayMode
     var size: CGFloat = 22
 
     var body: some View {
         switch mode {
+        case .tutorial:
+            Image(systemName: "graduationcap").font(.system(size: size))
         case .normal:
             ZStack {
                 KomaShape().stroke(lineWidth: 1.8).frame(width: size * 0.82, height: size)

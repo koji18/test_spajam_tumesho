@@ -15,7 +15,6 @@ struct TsumeshoApp: App {
                 .environment(session)
                 .environment(trial)
                 .environment(\.palette, session.palette)
-                .preferredColorScheme(session.tutorialCleared ? .dark : .light)
         }
     }
 }
@@ -30,7 +29,16 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            if playing {
+            if playing && session.mode == .tutorial {
+                TutorialView(startAt: session.tutorialDone ? 0 : session.tutorialStage) {
+                    playing = false
+                } onFinish: {
+                    // 修了したらノーマルで実戦へ。1 問目を解いているあいだに、作り置きも始めておく
+                    session.mode = .normal
+                    feed.didShow(index: 0, size: session.boardSize)
+                }
+                .transition(.move(edge: .bottom))
+            } else if playing {
                 FeedView(feed: feed) {
                     trial.stop()
                     playing = false
@@ -47,6 +55,8 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: playing)
+        // ホームと入門は明るい和紙の見た目なので、いつも明るい表示にする。暗くするのは、ネオンの問題画面だけ
+        .preferredColorScheme(playing && session.mode != .tutorial && session.tutorialCleared ? .dark : .light)
     }
 }
 

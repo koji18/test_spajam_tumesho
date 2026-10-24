@@ -52,8 +52,9 @@ final class Game {
     }
 
     // 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる
+    // 入門の問題は、説明を画面の上のカードに出すので、ここは空にしておく
     private static func prompt(for problem: Problem) -> String {
-        problem.id == 1 ? "王手をかけて、玉を詰ませよう" : ""
+        problem.id == 1 && problem.lesson == nil ? "王手をかけて、玉を詰ませよう" : ""
     }
 
     struct HandItem: Identifiable {

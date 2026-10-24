@@ -4,10 +4,17 @@ import Observation
 import UIKit
 
 enum PlayMode: String {
+    case tutorial
     case normal
     case timeTrial
 
-    var title: String { self == .normal ? "NORMAL" : "TIME TRIAL" }
+    var title: String {
+        switch self {
+        case .tutorial: "TUTORIAL"
+        case .normal: "NORMAL"
+        case .timeTrial: "TIME TRIAL"
+        }
+    }
 }
 
 // 1 問を解いて得たスコアとその内訳
@@ -56,6 +63,10 @@ final class Session {
     // 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
+    // 入門チュートリアル。次に挑む段（0 から数える）と、最後まで終えたか
+    var tutorialStage: Int { didSet { store.set(tutorialStage, forKey: "tutorialStage") } }
+    var tutorialDone: Bool { didSet { store.set(tutorialDone, forKey: "tutorialDone") } }
+
     var palette: Palette { tutorialCleared ? .neon : .classic }
 
     private(set) var rating: Int { didSet { store.set(rating, forKey: "rating") } }
@@ -70,7 +81,11 @@ final class Session {
     private(set) var scorePopup: Int?
 
     init() {
-        mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
+        // はじめて起動したときは、入門から始める。すでに遊んでいる人はノーマルのまま
+        let played = store.integer(forKey: "solvedTotal") > 0
+        mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? (played ? .normal : .tutorial)
+        tutorialStage = store.integer(forKey: "tutorialStage")
+        tutorialDone = store.bool(forKey: "tutorialDone")
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
         tutorialCleared = store.bool(forKey: "tutorialCleared")
