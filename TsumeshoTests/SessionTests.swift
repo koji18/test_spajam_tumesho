@@ -15,6 +15,7 @@ struct SessionTests {
         #expect(session.hapticsOn)
         #expect(!session.tutorialCleared)
         #expect(session.totalScore == 0)
+        #expect(session.soundVolume == 0.8)
     }
 
     @Test func 正解すると連勝とレーティングとスコアが増える() {
@@ -60,6 +61,7 @@ struct SessionTests {
         session.mode = .timeTrial
         session.tutorialCleared = true
         session.recordTimeTrial(solved: 7)
+        session.soundVolume = 0.3
 
         let reloaded = Session(store: store)
         #expect(reloaded.rating == session.rating)
@@ -70,6 +72,7 @@ struct SessionTests {
         #expect(reloaded.mode == .timeTrial)
         #expect(reloaded.tutorialCleared)
         #expect(reloaded.timeTrialBest == 7)
+        #expect(reloaded.soundVolume == 0.3)
     }
 
     @Test func タイムトライアルの最高記録は下がらない() {

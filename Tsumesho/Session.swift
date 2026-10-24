@@ -16,6 +16,8 @@ final class Session {
     var mode: PlayMode { didSet { store.set(mode.rawValue, forKey: "mode") } }
     var boardSize: BoardSize { didSet { store.set(boardSize.rawValue, forKey: "boardSize") } }
     var hapticsOn: Bool { didSet { store.set(hapticsOn, forKey: "hapticsOn") } }
+    /// 効果音の音量（0〜1）。0 なら鳴らさない
+    var soundVolume: Double { didSet { store.set(soundVolume, forKey: "soundVolume") } }
     /// 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
@@ -38,6 +40,7 @@ final class Session {
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
+        soundVolume = store.object(forKey: "soundVolume") as? Double ?? 0.8
         tutorialCleared = store.bool(forKey: "tutorialCleared")
         rating = store.object(forKey: "rating") as? Int ?? 1500
         streak = store.integer(forKey: "streak")

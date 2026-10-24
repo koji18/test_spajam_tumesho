@@ -234,6 +234,23 @@ struct SettingsView: View {
                     Text("詰んだとき、駒を動かしたとき、間違えたときに振動します")
                 }
                 Section {
+                    // 指を離したら、その音量で一度鳴らす
+                    HStack(spacing: 12) {
+                        Image(systemName: "speaker.fill").foregroundStyle(Theme.soft)
+                        Slider(value: $session.soundVolume, in: 0...1) { editing in
+                            if !editing { Sound.playMate(volume: session.soundVolume) }
+                        }
+                        .tint(Theme.neonCyan)
+                        .accessibilityLabel("効果音の音量")
+                        .accessibilityValue("\(Int(session.soundVolume * 100))パーセント")
+                        Image(systemName: "speaker.wave.3.fill").foregroundStyle(Theme.soft)
+                    }
+                } header: {
+                    Text("効果音の音量")
+                } footer: {
+                    Text("詰んだときに鳴ります。いちばん左にすると鳴りません。マナーモードのときは鳴りません")
+                }
+                Section {
                     Button("遊び方をもう一度見る", action: onShowTutorial)
                     Button("最初の演出をもう一度見る") {
                         // 普通の見た目に戻し、1 問目のチュートリアルを詰ませたらネオンに変わる演出をもう一度見せる
