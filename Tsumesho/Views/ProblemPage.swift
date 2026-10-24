@@ -131,6 +131,10 @@ struct ProblemPage: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.hint, lineWidth: game.hintHandKinds.contains(item.kind) ? 3 : 0)
                     )
+                    .overlay(
+                        // 間違えたときに見せる正解が、この持ち駒を打つ手のとき
+                        RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.ok, lineWidth: isRevealedDrop(item.kind) ? 3 : 0)
+                    )
                     .overlay {
                         // 1 問目の案内：タップしてほしい持ち駒を点滅させる
                         if game.guideHandKind == item.kind {
@@ -168,7 +172,7 @@ struct ProblemPage: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("正解は \(answer)").font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.ink)
-                    Text("もう一度か、上にスワイプで次へ").font(.system(size: 13)).foregroundStyle(Theme.soft)
+                    Text("盤の緑の枠が正解の駒と行き先です。もう一度か、上にスワイプで次へ").font(.system(size: 13)).foregroundStyle(Theme.soft)
                 }
                 Spacer()
                 Button("もう一度") { game.reset() }

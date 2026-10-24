@@ -114,6 +114,7 @@ struct BoardView: View {
         let isLast = game.lastMove?.to == i
         let isHintSource = game.hintSources.contains(i)
         let isHintTarget = game.hintTargets.contains(i)
+        let isRevealed = game.revealedAnswer.map { $0.from == i || $0.to == i } ?? false
 
         Button {
             game.tap(square: i)
@@ -125,6 +126,10 @@ struct BoardView: View {
                 if isSelected { RoundedRectangle(cornerRadius: 4).fill(Theme.accent.opacity(0.85)).padding(2) }
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
+                }
+                if isRevealed {
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ok, lineWidth: 3).padding(2)
                 }
                 if let piece {
                     KomaView(label: Notation.label(piece), promoted: piece.promoted,

@@ -190,16 +190,20 @@ final class Game {
             return
         }
         let before = position
-        let answers = before.mateMoves(plies: pliesLeft, where: Self.isInView)
-        position = before.playing(m)
-        lastMove = m
+        let answers = before.mateMoves(plies: pliesLeft, where: filter)
+        hintLevel = 0
+        refreshHints()
 
+        // 間違えたら指す前の盤に戻し、正解の駒と行き先を盤で見せる
         guard answers.contains(m) else {
-            let answer = answers.first.map { Notation.label($0, in: before) } ?? ""
+            revealedAnswer = answers.first
+            let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)
-            message = "残念、玉に逃げられます"
+            message = "残念、その手だと玉に逃げられます"
             return
         }
+        position = before.playing(m)
+        lastMove = m
         if position.isMate {
             let tesuji = firstMoveCaptured ? "捨て駒" : Notation.tesuji(m, in: before, captured: false)
             status = .solved(tesuji: tesuji)
@@ -208,12 +212,11 @@ final class Game {
         }
         // 3 手詰めの途中。玉方がいちばん粘る手で応じる
         pliesLeft -= 2
-        hintLevel = 0
         status = .thinking
         message = "玉方が考えています…"
         Task {
             try? await Task.sleep(for: .milliseconds(700))
-            guard let reply = position.bestDefense(plies: pliesLeft, where: Self.isInView) else { return }
+            guard let reply = position.bestDefense(plies: pliesLeft, where: filter) else { return }
             let replyLabel = Notation.label(reply, in: position)
             firstMoveCaptured = reply.to == m.to
             position = position.playing(reply)
