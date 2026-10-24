@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// 将棋の駒の五角形
+// 将棋の駒の五角形
 struct KomaShape: Shape {
-    /// r に収まる駒の五角形
     func path(in r: CGRect) -> Path {
         var p = Path()
         p.move(to: CGPoint(x: r.midX, y: r.minY))
@@ -15,7 +14,7 @@ struct KomaShape: Shape {
     }
 }
 
-/// 駒の光らせ方。攻め方はシアン、玉方はピンク、持ち駒は金色で光らせる
+// 駒の光らせ方。攻め方はシアン、玉方はピンク、持ち駒は金色で光らせる
 enum KomaTone {
     case attacker, defender, hand
 }
@@ -32,7 +31,7 @@ struct KomaView: View {
         if palette.plain { classic } else { neon }
     }
 
-    /// 普通の見た目：クリーム色の駒に黒い文字
+    // 普通の見た目：クリーム色の駒に黒い文字
     private var classic: some View {
         Text(label)
             .font(Theme.koma(size * 0.5))
@@ -67,7 +66,6 @@ struct KomaView: View {
             .rotationEffect(.degrees(upsideDown ? 180 : 0))
     }
 
-    /// ネオンの見た目での駒の文字の色
     private func textColor(_ glow: Color) -> Color {
         if tone == .hand { return Theme.cream }
         if promoted { return Theme.goldGlow }
@@ -75,23 +73,16 @@ struct KomaView: View {
     }
 }
 
-/// 将棋盤。9×9 の普通の盤か、玉のまわりの 5×5 を切り出した盤を表示する。
-/// 外枠は、切り出した辺も含めて 4 辺とも白く光らせる
+// 将棋盤。9×9 の普通の盤か、玉のまわりの 5×5 を切り出した盤を表示する。
+// 外枠は、切り出した辺も含めて 4 辺とも白く光らせる
 struct BoardView: View {
     let game: Game
     @Environment(\.palette) private var palette
+    @Environment(Session.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// 動かした駒の分身。指した瞬間に元のマスに置き、行き先まで滑らせる。着くまで行き先の本物は隠す
-    struct Flight: Equatable {
-        let id = UUID()
-        let move: Move
-        let piece: Piece
-        var arrived = false
-    }
-    @State private var flight: Flight?
-    /// 持ち駒を打ったマス。打った駒を少し大きく出してから縮めて収める
-    @State private var droppedSquare: Int?
+    @State private var moving: Move?
+    @State private var lastPresentedMove: Move?
+    @State private var rippleStartedAt: Date?
 
     var body: some View {
         let files = Array(game.visibleFiles.reversed())  // 左から ９ ８ … １（5×5 では切り出した 5 筋）
@@ -132,15 +123,6 @@ struct BoardView: View {
                 .overlay(alignment: .trailing) { edge(horizontal: false) }
                 .offset(y: labelSize)
 
-                if let flight, let from = flight.move.from,
-                   let start = center(of: from, files: files, ranks: ranks, cell: cell, labelSize: labelSize),
-                   let end = center(of: flight.move.to, files: files, ranks: ranks, cell: cell, labelSize: labelSize) {
-                    koma(flight.piece, size: cell)
-                        .frame(width: cell, height: cell)
-                        .position(flight.arrived ? end : start)
-                        .allowsHitTesting(false)
-                }
-
                 ForEach(Array(ranks.enumerated()), id: \.element) { j, r in
                     Text(Notation.rankLabel(r))
                         .font(.system(size: files.count > 5 ? 10 : 11, weight: .bold))
@@ -148,57 +130,55 @@ struct BoardView: View {
                         .fixedSize()
                         .position(x: gridWidth + labelSize / 2, y: labelSize + (CGFloat(j) + 0.5) * cell)
                 }
+
+                if let move = moving, let piece = game.position.board[move.to], !reduceMotion {
+                    let target = point(for: move.to, files: files, ranks: ranks, cell: cell)
+                    let source = move.from.map { point(for: $0, files: files, ranks: ranks, cell: cell) }
+                        ?? CGPoint(x: target.x, y: target.y + cell * 0.9)
+                    LandingKoma(piece: piece, source: source, target: target, cell: cell)
+                        .id(move)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .modifier(MateRippleEffect(
+                origin: game.lastMove.map { point(for: $0.to, files: files, ranks: ranks, cell: cell) } ?? .zero,
+                startedAt: rippleStartedAt, reduceMotion: reduceMotion))
         }
         .aspectRatio(1, contentMode: .fit)
-        // 間違えたら盤を左右に揺らす
         .modifier(ShakeEffect(animatableData: reduceMotion ? 0 : CGFloat(game.mistakes)))
         .animation(.linear(duration: 0.4), value: game.mistakes)
-        .onChange(of: game.lastMove) { _, move in
-            if let move { animate(move) }
-        }
-    }
-
-    /// 指した手を動きで見せる。盤の上の駒は滑らせ、打った駒は大きく出してから収める
-    private func animate(_ move: Move) {
-        guard !reduceMotion, let piece = game.position.board[move.to] else { return }
-        if move.from != nil {
-            let f = Flight(move: move, piece: piece)
-            flight = f
-            Task {
-                // 分身を元のマスに一度描いてから動かす
-                try? await Task.sleep(for: .milliseconds(16))
-                withAnimation(.easeOut(duration: 0.22)) { flight?.arrived = true }
-                try? await Task.sleep(for: .milliseconds(240))
-                if flight?.id == f.id { flight = nil }
+        .task(id: game.lastMove) {
+            rippleStartedAt = nil
+            guard let move = game.lastMove else {
+                moving = nil
+                lastPresentedMove = nil
+                return
             }
-        } else {
-            var instant = Transaction()
-            instant.disablesAnimations = true
-            withTransaction(instant) { droppedSquare = move.to }
-            Task {
-                try? await Task.sleep(for: .milliseconds(16))
-                withAnimation(.spring(duration: 0.35, bounce: 0.5)) { droppedSquare = nil }
-            }
+            guard move != lastPresentedMove else { return }
+            lastPresentedMove = move
+            moving = move
+            do {
+                if !reduceMotion { try await Task.sleep(for: .milliseconds(180)) }
+                try Task.checkCancellation()
+                Haptics.play(.landing, enabled: session.hapticsOn)
+                if case .solved = game.status, !reduceMotion { rippleStartedAt = Date() }
+                try await Task.sleep(for: .milliseconds(180))
+                moving = nil
+                try await Task.sleep(for: .milliseconds(720))
+                rippleStartedAt = nil
+            } catch { }
         }
+        .onDisappear { moving = nil; rippleStartedAt = nil }
     }
 
-    /// マスの中心の座標。表示範囲の外のマスなら nil
-    private func center(of square: Int, files: [Int], ranks: [Int], cell: CGFloat, labelSize: CGFloat) -> CGPoint? {
-        guard let i = files.firstIndex(of: Square.file(square)),
-              let j = ranks.firstIndex(of: Square.rank(square)) else { return nil }
-        return CGPoint(x: (CGFloat(i) + 0.5) * cell, y: labelSize + (CGFloat(j) + 0.5) * cell)
+    private func point(for square: Int, files: [Int], ranks: [Int], cell: CGFloat) -> CGPoint {
+        CGPoint(x: (CGFloat(files.firstIndex(of: Square.file(square)) ?? 0) + 0.5) * cell,
+                y: 18 + (CGFloat(ranks.firstIndex(of: Square.rank(square)) ?? 0) + 0.5) * cell)
     }
 
-    /// 盤の上の駒。玉方は逆さにしてピンク、攻め方はシアンで光らせる
-    private func koma(_ piece: Piece, size: CGFloat) -> some View {
-        KomaView(label: Notation.label(piece), promoted: piece.promoted,
-                 upsideDown: piece.side == .white, size: size,
-                 tone: piece.side == .white ? .defender : .attacker)
-    }
-
-    /// 盤の外枠の光る線
+    // 盤の外枠の光る線
     private func edge(horizontal: Bool) -> some View {
         Rectangle()
             .fill(palette.boardEdge)
@@ -207,7 +187,7 @@ struct BoardView: View {
             .allowsHitTesting(false)
     }
 
-    /// 星（盤の目印の点）。三段と四段、六段と七段の間、３筋と４筋、６筋と７筋の間の交点に打つ
+    // 星（盤の目印の点）。三段と四段、六段と七段の間、３筋と４筋、６筋と７筋の間の交点に打つ
     private func stars(files: [Int], ranks: [Int], cell: CGFloat) -> some View {
         let xs = [7, 4].compactMap { f in files.firstIndex(of: f).flatMap { i in i + 1 < files.count ? CGFloat(i + 1) * cell : nil } }
         let ys = [3, 6].compactMap { r in ranks.firstIndex(of: r).flatMap { i in i + 1 < ranks.count ? CGFloat(i + 1) * cell : nil } }
@@ -222,7 +202,6 @@ struct BoardView: View {
         .allowsHitTesting(false)
     }
 
-    /// 盤の 1 マス。駒と、動けるマス・選択・ヒント・正解の光を重ねる
     @ViewBuilder
     private func cellView(_ i: Int, size: CGFloat) -> some View {
         let piece = game.position.board[i]
@@ -261,14 +240,13 @@ struct BoardView: View {
                     RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ok, lineWidth: 3).padding(2)
                 }
-                // 動いている途中の駒は、分身が着くまで隠す
-                if let piece, flight?.move.to != i {
-                    // 選んだ駒は少し大きくして浮かせ、影を落として持ち上げたように見せる
-                    koma(piece, size: size)
-                        .scaleEffect(droppedSquare == i ? 1.45 : (isSelected ? 1.14 : 1))
-                        .offset(y: isSelected ? -size * 0.08 : 0)
-                        .shadow(color: .black.opacity(isSelected ? 0.5 : 0), radius: isSelected ? 4 : 0, y: isSelected ? 5 : 0)
-                        .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.45), value: isSelected)
+                if let piece, moving?.to != i || reduceMotion {
+                    KomaView(label: Notation.label(piece), promoted: piece.promoted,
+                             upsideDown: piece.side == .white, size: size,
+                             tone: piece.side == .white ? .defender : .attacker)
+                        .scaleEffect(isSelected && !reduceMotion ? 1.13 : 1)
+                        .offset(y: isSelected && !reduceMotion ? -4 : 0)
+                        .animation(.spring(duration: 0.2), value: isSelected)
                 }
             }
             .frame(width: size, height: size)
@@ -278,11 +256,62 @@ struct BoardView: View {
         .accessibilityLabel(accessibilityText(i, piece))
     }
 
-    /// マスの読み上げ。例「５一　玉方の玉」
     private func accessibilityText(_ i: Int, _ piece: Piece?) -> String {
         let at = Notation.fileLabel(Square.file(i)) + Notation.rankLabel(Square.rank(i))
         guard let piece else { return at }
         return at + (piece.side == .white ? "　玉方の" : "　") + Notation.label(piece)
+    }
+}
+
+private struct LandingKoma: View {
+    let piece: Piece
+    let source: CGPoint
+    let target: CGPoint
+    let cell: CGFloat
+
+    private struct Motion {
+        var progress: CGFloat = 0
+        var scale: CGFloat = 1.12
+        var lift: CGFloat = -8
+    }
+
+    var body: some View {
+        KomaView(label: Notation.label(piece), promoted: piece.promoted,
+                 upsideDown: piece.side == .white, size: cell,
+                 tone: piece.side == .white ? .defender : .attacker)
+            .keyframeAnimator(initialValue: Motion(), repeating: false) { content, motion in
+                content
+                    .scaleEffect(motion.scale)
+                    .position(x: source.x + (target.x - source.x) * motion.progress,
+                              y: source.y + (target.y - source.y) * motion.progress + motion.lift)
+            } keyframes: { _ in
+                KeyframeTrack(\.progress) { CubicKeyframe(1, duration: 0.18) }
+                KeyframeTrack(\.lift) {
+                    CubicKeyframe(0, duration: 0.18)
+                    SpringKeyframe(-3, duration: 0.07)
+                    SpringKeyframe(0, duration: 0.11)
+                }
+                KeyframeTrack(\.scale) {
+                    CubicKeyframe(0.9, duration: 0.18)
+                    SpringKeyframe(1, duration: 0.18)
+                }
+            }
+    }
+}
+
+private struct MateRippleEffect: ViewModifier {
+    let origin: CGPoint
+    let startedAt: Date?
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        TimelineView(.animation(paused: startedAt == nil || reduceMotion)) { context in
+            let elapsed = startedAt.map { max(0, context.date.timeIntervalSince($0)) } ?? 0
+            content.layerEffect(
+                ShaderLibrary.mateRipple(.float2(origin), .float(Float(elapsed))),
+                maxSampleOffset: CGSize(width: 16, height: 16),
+                isEnabled: startedAt != nil && elapsed < 0.9 && !reduceMotion)
+        }
     }
 }
 

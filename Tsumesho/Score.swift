@@ -1,3 +1,5 @@
+import Foundation
+
 /// 1 問を解いて得たスコアとその内訳
 struct ScoreGain {
     let points: Int
@@ -32,4 +34,16 @@ struct ScoreGain {
     static func format(_ multiplier: Double) -> String {
         String(format: "x%.1f", multiplier)
     }
+}
+
+// 一度の正解の内訳を固定し、次の問題へ移っても同じ報酬を演出する。
+struct SolveReward: Identifiable {
+    let id = UUID()
+    let gain: ScoreGain
+    let streak: Int
+    let previousRank: String
+    let rank: String
+
+    var rankedUp: Bool { previousRank != rank }
+    var isMilestone: Bool { streak > 0 && streak.isMultiple(of: 5) }
 }

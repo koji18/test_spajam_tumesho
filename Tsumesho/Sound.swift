@@ -13,6 +13,12 @@ enum Sound {
         pickPlayer = load("pick")
     }
 
+    /// 画面を離れたときと、バックグラウンドへ移ったときに止める。
+    static func stop() {
+        matePlayer?.stop()
+        pickPlayer?.stop()
+    }
+
     /// Sounds/ に入れた wav を読み込んで、すぐ鳴らせるようにしておく
     private static func load(_ name: String) -> AVAudioPlayer? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "wav"),

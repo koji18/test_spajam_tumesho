@@ -33,6 +33,7 @@ final class Session {
     private(set) var displayedScore: Int
     /// 数え上げている間だけ、カードの横に「+735」と出す
     private(set) var scorePopup: Int?
+    private var scoreRevealID = UUID()
 
     /// 保存してある設定と成績を読み込む。テストでは store にテスト専用の保存先を渡す
     init(store: UserDefaults = .standard) {
@@ -68,17 +69,29 @@ final class Session {
 
     /// カードのスコアを、今の表示から累計まで約 0.8 秒で数え上げる
     func revealScore() async {
+        let revealID = UUID()
+        scoreRevealID = revealID
         let from = displayedScore
         let to = totalScore
         guard to > from else { return }
         scorePopup = to - from
         let steps = 24
         for i in 1...steps {
+            guard !Task.isCancelled, scoreRevealID == revealID else { return }
             displayedScore = from + (to - from) * i / steps
-            try? await Task.sleep(for: .milliseconds(33))
+            do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
         }
-        displayedScore = totalScore
-        try? await Task.sleep(for: .milliseconds(600))
+        displayedScore = to
+        do { try await Task.sleep(for: .milliseconds(600)) } catch { return }
+        guard scoreRevealID == revealID else { return }
+        scorePopup = nil
+    }
+
+    /// 途中の数え上げを止めて、カードのスコアを累計に合わせ、「+○○」を消す。
+    /// pending には、累計に足したがまだ数え上げていない点（詰ませた直後の問題の点）を渡す。その分はあとの revealScore で数え上げる
+    func settleScore(excludingPending pending: Int = 0) {
+        scoreRevealID = UUID()
+        displayedScore = totalScore - pending
         scorePopup = nil
     }
 

@@ -27,6 +27,9 @@ struct TsumeshoApp: App {
 struct RootView: View {
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var tilt = TiltMotion()
     @State private var feed = ProblemFeed()
     @State private var playing = false
 
@@ -48,7 +51,12 @@ struct RootView: View {
                 .transition(.opacity)
             }
         }
+        .environment(tilt)
         .animation(.easeInOut(duration: 0.3), value: playing)
+        .task(id: scenePhase == .active && !reduceMotion) {
+            guard scenePhase == .active, !reduceMotion else { return }
+            await tilt.run()
+        }
         .onAppear(perform: applyDebugArguments)
     }
 

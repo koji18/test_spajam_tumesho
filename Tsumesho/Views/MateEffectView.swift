@@ -12,6 +12,7 @@ struct MateEffectView: View {
     let seconds: Int
     let tesuji: String?
     let seed: Int  // 光の筋・しぶき・紙吹雪の形を問題ごとに変える
+    let reward: SolveReward
     let onNext: () -> Void
 
     @State private var start = Date()
@@ -39,6 +40,12 @@ struct MateEffectView: View {
                     caption(t: t, width: area.width)
                         .position(x: area.width / 2, y: area.height * Self.centerRatio)
 
+                    rewardCaption
+                        .frame(maxWidth: area.width - 48)
+                        .scaleEffect(reduceMotion ? 1 : Self.spring(max(0, t - 0.2), from: 0.8, to: 1))
+                        .opacity(reduceMotion ? 1 : min(1, max(0, (t - 0.2) * 5)))
+                        .position(x: area.width / 2, y: area.height * 0.68)
+
                     VStack {
                         Spacer()
                         Text("次の問題へ ↑")
@@ -63,12 +70,36 @@ struct MateEffectView: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onNext)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("詰み。正解。\(plies)手詰め、\(seconds)秒" + (tesuji.map { "。手筋は\($0)" } ?? ""))
+        .accessibilityLabel("詰み。正解。\(plies)手詰め、\(seconds)秒、\(reward.streak)連勝、\(reward.gain.points)点獲得" + (tesuji.map { "。手筋は\($0)" } ?? ""))
         .accessibilityHint("タップすると次の問題へ進みます")
         .accessibilityAddTraits(.isButton)
     }
 
-    /// 「詰」の一文字だけを出す
+    private var rewardCaption: some View {
+        VStack(spacing: 8) {
+            if reward.streak >= 3 {
+                Text(reward.isMilestone ? "\(reward.streak)連勝 達成！" : "\(reward.streak)連勝")
+                    .font(.system(size: reward.isMilestone ? 30 : 24, weight: .heavy))
+                    .foregroundStyle(reward.isMilestone ? Theme.goldGlow : Theme.neonCyan)
+                    .shadow(color: Theme.goldGlow.opacity(0.7), radius: 12)
+            }
+            Text(verbatim: "+\(reward.gain.points)")
+                .font(Theme.number(42, weight: .black))
+                .foregroundStyle(Theme.cream)
+            HStack(spacing: 12) {
+                if reward.gain.speedBonus > 0 {
+                    Label("速解き +\(reward.gain.speedBonus)", systemImage: "bolt.fill")
+                }
+                Text("連勝 \(ScoreGain.format(reward.gain.streakMultiplier))")
+            }
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(Theme.goldGlow)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+        }
+    }
+
+    // 「詰」の一文字だけを出す
     private func caption(t: Double, width: CGFloat) -> some View {
         Text("詰")
             .font(Theme.brush(min(width * 0.56, 230)))

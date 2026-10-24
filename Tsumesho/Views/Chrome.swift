@@ -241,7 +241,10 @@ struct SettingsView: View {
                 Section {
                     Toggle("振動", isOn: $session.hapticsOn).tint(Theme.neonCyan)
                 } footer: {
-                    Text("詰んだとき、駒を動かしたとき、間違えたときに振動します")
+                    Text("駒の着地・正解・連勝・昇段に合わせて振動します。")
+                }
+                Section {
+                    NavigationLink("演出を試す") { FeedbackPreviewView() }
                 }
                 Section {
                     // 指を離したら、その音量で一度鳴らす
