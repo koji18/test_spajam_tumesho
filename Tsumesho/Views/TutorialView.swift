@@ -382,7 +382,10 @@ private struct StagePage: View {
 
     private var statusLine: some View {
         Group {
-            if let guide = game.guide {
+            if game.isNotCheckNotice || game.status.isFailed {
+                // 下のカードに同じ知らせを出すので、ここでは出さない
+                Text("")
+            } else if let guide = game.guide {
                 Label(guide, systemImage: "hand.point.up.left.fill").foregroundStyle(Washi.vermilion)
             } else {
                 Text(game.message).foregroundStyle(game.message.hasPrefix("王手になって") ? Washi.vermilion : Washi.ink)
@@ -405,7 +408,7 @@ private struct StagePage: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 56)
+        .frame(minHeight: 52)
     }
 
     private func handTile(_ item: Game.HandItem) -> some View {
@@ -444,32 +447,44 @@ private struct StagePage: View {
         .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : ""))
     }
 
-    // 間違えたときだけ、画面の下に出す。「もう一度」で消え、「答えを見る」を押すまで正解は出さない
-    private func failCard(_ answer: String) -> some View {
+    // 間違えたとき（玉に逃げられた、王手になっていない）だけ、画面の下に出す。
+    // どの段でも同じ形で、「答えを見る」を押すまで正解は出さない。「もう一度」で盤が戻って消える
+    private func helpCard(failed: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(game.answerShown ? "正解は \(answer)（盤の緑の枠）" : "残念、玉に逃げられました")
+            Text(helpTitle(failed: failed))
                 .font(.system(size: 14, weight: .bold)).foregroundStyle(Washi.ink)
-                .lineLimit(2)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
-                Button("もう一度") { game.reset() }
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Washi.paper)
-                    .frame(maxWidth: .infinity, minHeight: 38)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Washi.vermilion))
+                if failed || game.answerShown {
+                    helpButton("もう一度", filled: true) { game.reset() }
+                } else {
+                    helpButton(game.hintLevel >= 2 ? "ヒント済み" : "ヒント", filled: true) { game.showHint() }
+                        .disabled(game.hintLevel >= 2)
+                }
                 if !game.answerShown {
-                    Button("答えを見る") { game.showAnswer() }
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Washi.vermilion)
-                        .frame(maxWidth: .infinity, minHeight: 38)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: 1.5))
+                    helpButton("答えを見る", filled: false) { game.showAnswer() }
                 }
             }
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 4).fill(Washi.paper.opacity(0.9)))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion.opacity(0.6), lineWidth: 1))
+    }
+
+    private func helpTitle(failed: Bool) -> String {
+        if let text = game.answerText { return "正解は \(text)（盤の緑の枠）" }
+        return failed ? "残念、玉に逃げられました" : "王手になっていません。王手をかけよう"
+    }
+
+    private func helpButton(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(filled ? Washi.paper : Washi.vermilion)
+            .frame(maxWidth: .infinity, minHeight: 38)
+            .background(RoundedRectangle(cornerRadius: 4).fill(filled ? Washi.vermilion : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: filled ? 0 : 1.5))
     }
 
     // MARK: 下のボタン
@@ -498,11 +513,16 @@ private struct StagePage: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if case .failed(let answer) = game.status {
+        } else if case .failed = game.status {
             // 間違えたときは、スクロールしなくても読んで押せるように、画面の下に固定して出す
-            failCard(answer)
+            helpCard(failed: true)
                 .padding(.horizontal, 24)
-                .padding(.vertical, 10)
+                .padding(.vertical, 6)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if game.isNotCheckNotice || (game.answerShown && game.status == .playing) {
+            helpCard(failed: false)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
             HStack(spacing: 28) {

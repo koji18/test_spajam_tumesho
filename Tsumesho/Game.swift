@@ -10,6 +10,7 @@ final class Game {
     }
 
     enum Status: Equatable {
+        var isFailed: Bool { if case .failed = self { return true } else { return false } }
         case playing
         case thinking                 // 玉方が応手を考えている
         case solved(tesuji: String?)
@@ -170,7 +171,20 @@ final class Game {
         attempt(promote ? pending.promote : pending.stay)
     }
 
-    func showAnswer() { answerShown = true }
+    // 答えを見る。王手でない手を指して失敗にならなかったときは、いまの局面から正解を求める
+    func showAnswer() {
+        if answerMove == nil { answerMove = position.mateMoves(plies: pliesLeft, where: filter).first }
+        answerShown = true
+    }
+
+    // 見せている正解の手の説明（「３二に金を打つ」など）
+    var answerText: String? {
+        guard answerShown, let m = answerMove else { return nil }
+        return Notation.describe(m, in: position)
+    }
+
+    // 王手になっていない手を指したあとの知らせが出ているか
+    var isNotCheckNotice: Bool { status == .playing && message.hasPrefix("王手になって") }
 
     func reset() {
         position = problem.position
@@ -189,6 +203,8 @@ final class Game {
     }
 
     private func select(_ s: Selection?) {
+        // 王手でなかったときの知らせは、次に駒を選んだら消す
+        if message.hasPrefix("王手になって") { message = Self.prompt(for: problem) }
         selection = s
         targets = Set(candidateMoves().map(\.to))
     }
@@ -227,6 +243,9 @@ final class Game {
         }
         position = before.playing(m)
         lastMove = m
+        // 正しい手を指したので、見せていた正解は片づける（3 手詰めの次の手で古い答えが残らないように）
+        answerMove = nil
+        answerShown = false
         if position.isMate {
             let tesuji = firstMoveCaptured ? "捨て駒" : Notation.tesuji(m, in: before, captured: false)
             solvedSeconds = Int(Date().timeIntervalSince(startedAt ?? Date()))
