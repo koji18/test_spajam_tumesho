@@ -2,13 +2,12 @@ import SwiftUI
 
 /// 画面の上に固定するバー。左に今のモード、右にメニューを開く歯車
 struct TopBar: View {
-    static let height: CGFloat = 72
-
     let insets: EdgeInsets
     let menuOpen: Bool
     let onMenu: () -> Void
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
+    @Environment(\.pageLayout) private var layout
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,7 +16,7 @@ struct TopBar: View {
                 Button(action: onMenu) {
                     ModeIcon(mode: session.mode)
                         .foregroundStyle(palette.accent)
-                        .frame(width: 52, height: 52)
+                        .frame(width: layout.barButton, height: layout.barButton)
                         .background(Circle().fill(palette.panel.opacity(0.8)))
                         .overlay(Circle().stroke(palette.accent, lineWidth: 1.5))
                         .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 10)
@@ -32,7 +31,7 @@ struct TopBar: View {
                     Image(systemName: "gearshape")
                         .font(.system(size: 22))
                         .foregroundStyle(menuOpen ? Theme.neonCyan : palette.text.opacity(0.85))
-                        .frame(width: 52, height: 52)
+                        .frame(width: layout.barButton, height: layout.barButton)
                         .background(Circle().fill(palette.panel.opacity(0.8)))
                         .overlay(Circle().stroke(menuOpen ? Theme.neonCyan : palette.text.opacity(0.3), lineWidth: 1.5))
                         .shadow(color: Theme.neonCyan.opacity(menuOpen ? 0.7 : 0), radius: 10)
@@ -41,7 +40,7 @@ struct TopBar: View {
                 .accessibilityLabel(menuOpen ? "メニューを閉じる" : "メニュー")
             }
             .padding(.horizontal, 20)
-            .frame(height: Self.height - 1)
+            .frame(height: layout.topBarHeight - 1)
             Rectangle().fill(palette.text.opacity(0.08)).frame(height: 1)
         }
         .padding(.top, insets.top)

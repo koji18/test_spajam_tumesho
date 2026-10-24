@@ -70,7 +70,7 @@ struct FeedView: View {
                         onSettings: { closeMenu(); showSettings = true },
                         onSize: { newSize in closeMenu(); switchSize(to: newSize) }
                     )
-                    .padding(.top, geo.safeAreaInsets.top + TopBar.height + 4)
+                    .padding(.top, geo.safeAreaInsets.top + layout(geo).topBarHeight + 4)
                     .padding(.horizontal, 20)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .transition(.scale(scale: 0.9, anchor: .topTrailing).combined(with: .opacity))
@@ -99,6 +99,7 @@ struct FeedView: View {
             }
             // 上のバーとメニューは geo.safeAreaInsets で自分で安全領域をよける
             .ignoresSafeArea()
+            .environment(\.pageLayout, layout(geo))
         }
         .background(Theme.background.ignoresSafeArea())
         .onChange(of: problems.count) {
@@ -122,6 +123,11 @@ struct FeedView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView { showSettings = false; onHome() }
         }
+    }
+
+    /// 画面全体の高さ（安全領域も含む）から、部品の大きさを決める
+    private func layout(_ geo: GeometryProxy) -> PageLayout {
+        PageLayout.forScreen(height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
     }
 
     /// メニューを閉じる

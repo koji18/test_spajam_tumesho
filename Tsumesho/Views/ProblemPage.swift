@@ -8,6 +8,7 @@ struct ProblemPage: View {
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
     @Environment(\.palette) private var palette
+    @Environment(\.pageLayout) private var layout
     @State private var game: Game
 
     /// 1 問ぶんのページを作る。詰んだら onSolved に解いた秒数と手筋の名前を渡す
@@ -19,7 +20,7 @@ struct ProblemPage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: layout.spacing) {
             modeRow
             titleRow
             BoardView(game: game)
@@ -33,7 +34,7 @@ struct ProblemPage: View {
             controls
         }
         .padding(.horizontal, 20)
-        .padding(.top, insets.top + TopBar.height + 8)
+        .padding(.top, insets.top + layout.topBarHeight + (layout.compact ? 4 : 8))
         .padding(.bottom, insets.bottom + 6)
         .background(NeonBackdrop())
         .confirmationDialog("成りますか？", isPresented: promotionBinding, titleVisibility: .visible) {
@@ -86,7 +87,7 @@ struct ProblemPage: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("\(Theme.kanjiNumber(problem.plies))手詰")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: layout.title, weight: .heavy))
                     .foregroundStyle(palette.text)
                 Text("第\(problem.id)問 ・ 攻め方 先手")
                     .font(.system(size: 14, weight: .semibold))
@@ -101,7 +102,7 @@ struct ProblemPage: View {
                         let urgent = left < 10
                         let blinkOff = urgent && Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
                         Text(TimeTrial.format(left))
-                            .font(Theme.number(30, weight: .black))
+                            .font(Theme.number(layout.counter, weight: .black))
                             .monospacedDigit()
                             .foregroundStyle(urgent ? Color.red : palette.counter)
                             .shadow(color: (urgent ? Color.red : Theme.neonPink).opacity(0.8 * palette.glow), radius: 8)
@@ -127,7 +128,7 @@ struct ProblemPage: View {
                         .foregroundStyle(palette.subText)
                 } else {
                     Text("\(game.currentPly)/\(problem.plies)")
-                        .font(Theme.number(30, weight: .black))
+                        .font(Theme.number(layout.counter, weight: .black))
                         .foregroundStyle(palette.counter)
                         .shadow(color: Theme.neonPink.opacity(0.8 * palette.glow), radius: 8)
                     Text("手目")
@@ -183,7 +184,7 @@ struct ProblemPage: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 64)
+        .frame(minHeight: layout.handRowHeight)
     }
 
     /// 持ち駒の 1 枚ぶんのタイル
@@ -193,11 +194,11 @@ struct ProblemPage: View {
             game.tap(hand: item.kind)
         } label: {
             // 選んだ持ち駒は少し大きくして浮かせる
-            KomaView(label: Notation.label(item.kind), size: 46, tone: .hand)
+            KomaView(label: Notation.label(item.kind), size: layout.handPiece, tone: .hand)
                 .scaleEffect(selected ? 1.1 : 1)
                 .offset(y: selected ? -3 : 0)
                 .animation(.spring(duration: 0.25, bounce: 0.45), value: selected)
-                .frame(width: 60, height: 60)
+                .frame(width: layout.handTile, height: layout.handTile)
                 .background(RoundedRectangle(cornerRadius: 12).fill(palette.panel))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -262,7 +263,7 @@ struct ProblemPage: View {
 
     private var controls: some View {
         HStack(spacing: 56) {
-            CircleButton(systemImage: "lightbulb", color: palette.hintButton, glow: false) {
+            CircleButton(systemImage: "lightbulb", color: palette.hintButton, glow: false, size: layout.circleButton) {
                 game.showHint()
             }
             .overlay(alignment: .topTrailing) {
@@ -277,7 +278,8 @@ struct ProblemPage: View {
             .disabled(game.status != .playing || game.hintLevel >= 2)
             .accessibilityLabel(game.hintLevel == 0 ? "ヒント" : "ヒント、\(game.hintLevel)回目まで使用")
 
-            CircleButton(systemImage: "arrow.counterclockwise", color: palette.resetButton, glow: !palette.plain) {
+            CircleButton(systemImage: "arrow.counterclockwise", color: palette.resetButton, glow: !palette.plain,
+                         size: layout.circleButton) {
                 game.reset()
             }
             .accessibilityLabel("盤面をリセット")
@@ -290,6 +292,7 @@ struct ProblemPage: View {
 struct RatingCard: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
+    @Environment(\.pageLayout) private var layout
 
     var body: some View {
         /// 連勝の目盛りは 5 つ。5 連勝ごとに一周する
@@ -298,14 +301,14 @@ struct RatingCard: View {
             Text(session.rankBadge)
                 .font(.system(size: 18, weight: .heavy))
                 .foregroundStyle(palette.text)
-                .frame(width: 46, height: 46)
+                .frame(width: layout.badge, height: layout.badge)
                 .background(Circle().fill(palette.panel))
                 .overlay(Circle().stroke(palette.badgeStroke, lineWidth: 1.5))
                 .shadow(color: Theme.neonCyan.opacity(0.6 * palette.glow), radius: 8)
             VStack(alignment: .leading, spacing: 0) {
                 Text("RATING").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
                 Text(verbatim: "\(session.rating)")
-                    .font(Theme.number(30, weight: .black))
+                    .font(Theme.number(layout.rating, weight: .black))
                     .foregroundStyle(palette.rating)
                     .shadow(color: Theme.neonCyan.opacity(0.8 * palette.glow), radius: 8)
                     .contentTransition(.numericText())
@@ -314,7 +317,7 @@ struct RatingCard: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text("SCORE").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
                 Text(verbatim: "\(session.displayedScore)")
-                    .font(Theme.number(22, weight: .black))
+                    .font(Theme.number(layout.score, weight: .black))
                     .foregroundStyle(palette.accent)
                     .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 6)
                     .overlay(alignment: .topLeading) {
@@ -353,7 +356,7 @@ struct RatingCard: View {
                 }
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, 16).padding(.vertical, layout.cardPadding)
         .background(RoundedRectangle(cornerRadius: 18).fill(palette.panel.opacity(0.85)))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(palette.panelStroke, lineWidth: 1))
         .animation(.spring, value: session.rating)
