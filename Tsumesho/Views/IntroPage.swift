@@ -135,14 +135,10 @@ struct IntroPage: View {
         }
     }
 
+    /// 段位の境目と名前は Session.ranks で決める
     private var rank: (fraction: Double, text: String) {
-        let bounds = [1400, 1600, 1800, 2000, 2200]
-        let names = ["初段", "二段", "三段", "四段", "五段"]
-        let rating = session.rating
-        guard let i = bounds.firstIndex(where: { rating < $0 }) else { return (1, "最高段に到達") }
-        let lower = i == 0 ? 1200 : bounds[i - 1]
-        let fraction = min(1, max(0, Double(rating - lower) / Double(bounds[i] - lower)))
-        return (fraction, "\(names[i])まで あと \(bounds[i] - rating)")
+        guard let next = Session.nextRank(for: session.rating) else { return (1, "最高段に到達") }
+        return (next.fraction, "\(next.rank.name)まで あと \(next.remaining)")
     }
 
     // MARK: 縦書きのタイトル

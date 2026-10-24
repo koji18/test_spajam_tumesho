@@ -132,17 +132,45 @@ final class Session {
         timeTrialBest = max(timeTrialBest, solved)
     }
 
-    /// レーティングに応じた段位のバッジ
-    var rankBadge: String {
-        switch rating {
-        case ..<1400: "級"
-        case ..<1600: "初"
-        case ..<1800: "二"
-        case ..<2000: "三"
-        case ..<2200: "四"
-        default: "五"
-        }
+    /// 段位。レーティングが lowerBound 以上になると、その段位になる
+    struct Rank: Equatable {
+        let badge: String     // バッジの一文字（級・初・二…）
+        let lowerBound: Int
+
+        /// 段位の名前（級位・初段・二段…）
+        var name: String { Rank.name(ofBadge: badge) }
+
+        /// バッジの一文字から段位の名前を作る
+        static func name(ofBadge badge: String) -> String { badge == "級" ? "級位" : "\(badge)段" }
     }
 
-    var rankName: String { rankBadge == "級" ? "級位" : "\(rankBadge)段" }
+    /// 段位の一覧。段位の境目と名前は、ここだけで決める。級位の lowerBound は、ホームのゲージの起点
+    static let ranks: [Rank] = [
+        Rank(badge: "級", lowerBound: 1200),
+        Rank(badge: "初", lowerBound: 1400),
+        Rank(badge: "二", lowerBound: 1600),
+        Rank(badge: "三", lowerBound: 1800),
+        Rank(badge: "四", lowerBound: 2000),
+        Rank(badge: "五", lowerBound: 2200),
+    ]
+
+    /// rating のときの段位
+    static func rank(for rating: Int) -> Rank {
+        ranks.last { rating >= $0.lowerBound && $0.badge != "級" } ?? ranks[0]
+    }
+
+    /// 次の段位と、そこまでの進み具合（0〜1）と、あと何点か。最高段なら nil
+    static func nextRank(for rating: Int) -> (rank: Rank, fraction: Double, remaining: Int)? {
+        let current = rank(for: rating)
+        guard let i = ranks.firstIndex(of: current), i + 1 < ranks.count else { return nil }
+        let next = ranks[i + 1]
+        let span = Double(next.lowerBound - current.lowerBound)
+        let fraction = min(1, max(0, Double(rating - current.lowerBound) / span))
+        return (next, fraction, next.lowerBound - rating)
+    }
+
+    /// レーティングに応じた段位のバッジ
+    var rankBadge: String { Self.rank(for: rating).badge }
+
+    var rankName: String { Self.rank(for: rating).name }
 }

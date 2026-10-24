@@ -88,7 +88,7 @@ struct RankUpView: View {
         .accessibilityAddTraits(.isModal)
     }
 
-    private func rankName(_ badge: String) -> String { badge == "級" ? "級位" : "\(badge)段" }
+    private func rankName(_ badge: String) -> String { Session.Rank.name(ofBadge: badge) }
 }
 
 // 成績を変えずに、すべての連勝音と昇段を確認できる。
