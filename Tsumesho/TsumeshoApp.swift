@@ -132,9 +132,10 @@ struct FeedView: View {
                 .scrollTargetBehavior(.paging)
                 .scrollIndicators(.hidden)
                 .ignoresSafeArea()
+
                 .blur(radius: menuOpen ? 10 : 0)
 
-                TopBar(insets: geo.safeAreaInsets, menuOpen: menuOpen, onMode: select) {
+                TopBar(insets: geo.safeAreaInsets, menuOpen: menuOpen) {
                     withAnimation(.spring(duration: 0.3)) { menuOpen.toggle() }
                 }
 
@@ -145,6 +146,7 @@ struct FeedView: View {
                         .transition(.opacity)
                     MenuPanel(
                         onHome: { closeMenu(); onHome() },
+                        onMode: { mode in closeMenu(); select(mode) },
                         onRecords: { closeMenu(); showRecords = true },
                         onSettings: { closeMenu(); showSettings = true },
                         onSize: { newSize in closeMenu(); switchSize(to: newSize) }
