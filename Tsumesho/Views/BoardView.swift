@@ -14,13 +14,25 @@ struct KomaShape: Shape {
     }
 }
 
+// 駒の光らせ方。攻め方はシアン、玉方はピンク、持ち駒は金色で光らせる
+enum KomaTone {
+    case attacker, defender, hand
+}
+
 struct KomaView: View {
     let label: String
     var promoted = false
     var upsideDown = false
     let size: CGFloat
+    var tone: KomaTone = .attacker
+    @Environment(\.palette) private var palette
 
     var body: some View {
+        if palette.plain { classic } else { neon }
+    }
+
+    // 普通の見た目：クリーム色の駒に黒い文字
+    private var classic: some View {
         Text(label)
             .font(Theme.koma(size * 0.5))
             .foregroundStyle(promoted ? Color(red: 0.72, green: 0.12, blue: 0.12) : Theme.pieceInk)
@@ -29,12 +41,43 @@ struct KomaView: View {
             .background(KomaShape().fill(Theme.piece).shadow(color: .black.opacity(0.25), radius: 1, y: 1))
             .rotationEffect(.degrees(upsideDown ? 180 : 0))
     }
+
+    // ネオンの見た目：黒い駒の縁と文字を光らせる
+    @ViewBuilder
+    private var neon: some View {
+        let glow: Color = switch tone {
+        case .attacker: Theme.neonCyan
+        case .defender: Theme.neonPink
+        case .hand: Theme.goldGlow
+        }
+        Text(label)
+            .font(Theme.koma(size * 0.5))
+            .foregroundStyle(textColor(glow))
+            .shadow(color: glow.opacity(0.9), radius: 3)
+            .padding(.top, size * 0.12)
+            .frame(width: size * 0.82, height: size * 0.92)
+            .background {
+                ZStack {
+                    KomaShape().fill(Theme.pieceFill)
+                    KomaShape().stroke(glow, lineWidth: max(1.2, size * 0.045))
+                }
+                .shadow(color: glow.opacity(0.85), radius: size * 0.12)
+            }
+            .rotationEffect(.degrees(upsideDown ? 180 : 0))
+    }
+
+    private func textColor(_ glow: Color) -> Color {
+        if tone == .hand { return Theme.cream }
+        if promoted { return Theme.goldGlow }
+        return tone == .defender ? Theme.neonPink : .white
+    }
 }
 
 // 将棋盤。9×9 の普通の盤か、玉のまわりの 5×5 を切り出した盤を表示する。
-// 本物の盤の端は太い線、切り出した辺は細い線で描く
+// 外枠は、切り出した辺も含めて 4 辺とも白く光らせる
 struct BoardView: View {
     let game: Game
+    @Environment(\.palette) private var palette
 
     var body: some View {
         let files = Array(game.visibleFiles.reversed())  // 左から ９ ８ … １（5×5 では切り出した 5 筋）
@@ -49,8 +92,8 @@ struct BoardView: View {
                     }
                     Spacer().frame(width: labelSize)
                 }
-                .font(Theme.mono(files.count > 5 ? 10 : 11))
-                .foregroundStyle(Theme.soft)
+                .font(Theme.display(files.count > 5 ? 11 : 13, weight: .medium))
+                .foregroundStyle(palette.coordinate)
 
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
@@ -62,12 +105,13 @@ struct BoardView: View {
                             }
                         }
                     }
-                    .background(Theme.wood)
+                    .background(palette.boardFill)
+                    .shadow(color: .white.opacity(0.18 * palette.glow), radius: 16)
                     .overlay { stars(files: files, ranks: ranks, cell: cell) }
-                    .overlay(alignment: .top) { edge(isReal: ranks.first == 1, horizontal: true) }
-                    .overlay(alignment: .bottom) { edge(isReal: ranks.last == 9, horizontal: true) }
-                    .overlay(alignment: .leading) { edge(isReal: files.first == 9, horizontal: false) }
-                    .overlay(alignment: .trailing) { edge(isReal: files.last == 1, horizontal: false) }
+                    .overlay(alignment: .top) { edge(horizontal: true) }
+                    .overlay(alignment: .bottom) { edge(horizontal: true) }
+                    .overlay(alignment: .leading) { edge(horizontal: false) }
+                    .overlay(alignment: .trailing) { edge(horizontal: false) }
 
                     VStack(spacing: 0) {
                         ForEach(ranks, id: \.self) { r in
@@ -75,19 +119,19 @@ struct BoardView: View {
                         }
                     }
                     .font(.system(size: files.count > 5 ? 10 : 11, weight: .bold))
-                    .foregroundStyle(Theme.soft)
+                    .foregroundStyle(palette.coordinate)
                 }
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .animation(.easeInOut(duration: 0.25), value: game.smallBoard)
     }
 
-    private func edge(isReal: Bool, horizontal: Bool) -> some View {
-        let width: CGFloat = isReal ? 3 : 1
-        return Rectangle()
-            .fill(Theme.woodLine.opacity(isReal ? 1 : 0.5))
-            .frame(width: horizontal ? nil : width, height: horizontal ? width : nil)
+    // 盤の外枠の光る線
+    private func edge(horizontal: Bool) -> some View {
+        Rectangle()
+            .fill(palette.boardEdge)
+            .frame(width: horizontal ? nil : 2, height: horizontal ? 2 : nil)
+            .shadow(color: .white.opacity(0.7 * palette.glow), radius: 5)
             .allowsHitTesting(false)
     }
 
@@ -98,7 +142,7 @@ struct BoardView: View {
         return ZStack(alignment: .topLeading) {
             ForEach(xs, id: \.self) { x in
                 ForEach(ys, id: \.self) { y in
-                    Circle().fill(Theme.woodLine).frame(width: 5, height: 5).position(x: x, y: y)
+                    Circle().fill(palette.boardEdge.opacity(0.7)).frame(width: 4, height: 4).position(x: x, y: y)
                 }
             }
         }
@@ -120,10 +164,17 @@ struct BoardView: View {
             game.tap(square: i)
         } label: {
             ZStack {
-                Rectangle().strokeBorder(Theme.woodLine.opacity(0.7), lineWidth: 0.5)
-                if isLast { Rectangle().fill(Theme.hint.opacity(0.22)) }
-                if isTarget { RoundedRectangle(cornerRadius: 4).fill(Theme.accent.opacity(0.55)).padding(3) }
-                if isSelected { RoundedRectangle(cornerRadius: 4).fill(Theme.accent.opacity(0.85)).padding(2) }
+                Rectangle().strokeBorder(palette.gridLine, lineWidth: 0.5)
+                if isLast { Rectangle().fill(palette.lastMove.opacity(0.18)) }
+                if isTarget {
+                    RoundedRectangle(cornerRadius: 4).fill(palette.target.opacity(0.22)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.target.opacity(0.9), lineWidth: 1.5).padding(2)
+                }
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 4).fill(palette.accent.opacity(0.28)).padding(1)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.accent, lineWidth: 2).padding(1)
+                        .shadow(color: palette.accent.opacity(palette.glow), radius: 5)
+                }
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
                 }
@@ -133,7 +184,8 @@ struct BoardView: View {
                 }
                 if let piece {
                     KomaView(label: Notation.label(piece), promoted: piece.promoted,
-                             upsideDown: piece.side == .white, size: size)
+                             upsideDown: piece.side == .white, size: size,
+                             tone: piece.side == .white ? .defender : .attacker)
                 }
             }
             .frame(width: size, height: size)
