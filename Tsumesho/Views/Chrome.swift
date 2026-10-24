@@ -199,7 +199,7 @@ struct RecordsView: View {
                     stat("今の連勝", "\(session.streak)")
                     stat("最高連勝", "\(session.bestStreak)")
                 }
-                Section("タイムトライアル（3分）") {
+                Section("タイムトライアル（60秒＋正解で加算）") {
                     stat("最高記録", "\(session.timeTrialBest) 問")
                 }
             }

@@ -43,6 +43,7 @@ struct ProblemPage: View {
         .onChange(of: game.status) { _, status in
             switch status {
             case .solved(let tesuji):
+                trial.recordSolve(plies: problem.plies, hintsUsed: game.hintsUsed)
                 // スコアは裏で累計に足し、演出が消えてからカードで数え上げる
                 session.recordSolve(plies: problem.plies, size: problem.size,
                                     seconds: game.solvedSeconds, hintsUsed: game.hintsUsed)
@@ -50,6 +51,7 @@ struct ProblemPage: View {
                 onSolved(game.solvedSeconds, tesuji)
             case .failed:
                 session.recordMiss()
+                trial.recordMiss()
             default:
                 break
             }
@@ -95,12 +97,32 @@ struct ProblemPage: View {
             VStack(alignment: .trailing, spacing: 4) {
                 if trial.isRunning {
                     TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                        Text(TimeTrial.format(trial.remaining(at: context.date)))
+                        let left = trial.remaining(at: context.date)
+                        // 残り 10 秒を切ったら赤く点滅させる
+                        let urgent = left < 10
+                        let blinkOff = urgent && Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
+                        Text(TimeTrial.format(left))
                             .font(Theme.number(30, weight: .black))
                             .monospacedDigit()
-                            .foregroundStyle(palette.counter)
-                            .shadow(color: Theme.neonPink.opacity(0.8 * palette.glow), radius: 8)
+                            .foregroundStyle(urgent ? Color.red : palette.counter)
+                            .shadow(color: (urgent ? Color.red : Theme.neonPink).opacity(0.8 * palette.glow), radius: 8)
+                            .opacity(blinkOff ? 0.35 : 1)
                     }
+                    .overlay(alignment: .leading) {
+                        // 正解で増えた秒数、間違いで減った秒数
+                        if let popup = trial.popup {
+                            Text(verbatim: popup.seconds > 0 ? "+\(popup.seconds)s" : "\(popup.seconds)s")
+                                .font(Theme.number(18, weight: .heavy))
+                                .foregroundStyle(popup.seconds > 0 ? palette.accent : Color.red)
+                                .shadow(color: (popup.seconds > 0 ? Theme.goldGlow : Color.red).opacity(palette.glow), radius: 8)
+                                .fixedSize()
+                                .offset(x: -64)
+                                .id(popup.id)
+                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity),
+                                                        removal: .move(edge: .top).combined(with: .opacity)))
+                        }
+                    }
+                    .animation(.spring(duration: 0.4), value: trial.popup)
                     Text("\(game.currentPly) / \(problem.plies) 手目")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(palette.subText)
