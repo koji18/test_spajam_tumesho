@@ -467,13 +467,9 @@ private struct StagePage: View {
                 .font(.system(size: 14, weight: .bold)).foregroundStyle(Washi.ink)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
+            // 玉に逃げられたときも、王手になっていないときも、同じ「もう一度」と「答えを見る」にする
             HStack(spacing: 10) {
-                if failed || game.answerShown {
-                    helpButton("もう一度", filled: true) { game.reset() }
-                } else {
-                    helpButton(game.hintLevel >= 2 ? "ヒント済み" : "ヒント", filled: true) { game.showHint() }
-                        .disabled(game.hintLevel >= 2)
-                }
+                helpButton("もう一度", filled: true) { game.reset() }
                 if !game.answerShown {
                     helpButton("答えを見る", filled: false) { game.showAnswer() }
                 }
