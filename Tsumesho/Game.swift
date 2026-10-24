@@ -35,6 +35,8 @@ final class Game {
     private(set) var hintTargets: Set<Int> = []
     /// 間違えたときに盤で見せる正解の手
     private(set) var revealedAnswer: Move?
+    /// 間違えた回数（王手でない手を指そうとしたときも数える）。盤を揺らすきっかけに使う
+    private(set) var mistakes = 0
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
@@ -210,6 +212,7 @@ final class Game {
     private func attempt(_ m: Move) {
         select(nil)
         guard position.givesCheck(m) else {
+            mistakes += 1
             message = "王手になっていません。詰将棋は毎回王手をかけます"
             return
         }
@@ -220,6 +223,7 @@ final class Game {
 
         // 間違えたら指す前の盤に戻し、正解の駒と行き先を盤で見せる
         guard answers.contains(m) else {
+            mistakes += 1
             revealedAnswer = answers.first
             let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)

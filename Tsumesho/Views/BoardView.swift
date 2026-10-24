@@ -152,6 +152,9 @@ struct BoardView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
         .aspectRatio(1, contentMode: .fit)
+        // 間違えたら盤を左右に揺らす
+        .modifier(ShakeEffect(animatableData: reduceMotion ? 0 : CGFloat(game.mistakes)))
+        .animation(.linear(duration: 0.4), value: game.mistakes)
         .onChange(of: game.lastMove) { _, move in
             if let move { animate(move) }
         }
@@ -270,5 +273,16 @@ struct BoardView: View {
         let at = Notation.fileLabel(Square.file(i)) + Notation.rankLabel(Square.rank(i))
         guard let piece else { return at }
         return at + (piece.side == .white ? "　玉方の" : "　") + Notation.label(piece)
+    }
+}
+
+/// 盤を左右に揺らす動き。animatableData が 1 増えるあいだに 3 往復する
+struct ShakeEffect: GeometryEffect {
+    var animatableData: CGFloat
+
+    /// 揺れの横ずれ。往復の真ん中ほど大きく、始めと終わりは 0
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let x = 9 * sin(animatableData * .pi * 6)
+        return ProjectionTransform(CGAffineTransform(translationX: x, y: 0))
     }
 }

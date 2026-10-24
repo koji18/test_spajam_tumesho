@@ -44,6 +44,7 @@ struct GameTests {
         #expect(game.status == .playing)
         #expect(game.message.hasPrefix("王手になっていません"))
         #expect(game.position.sfenBoard == start)
+        #expect(game.mistakes == 1)  // 盤を揺らす
     }
 
     @Test func 間違えると盤を戻し_正解の手を見せる() {
@@ -54,6 +55,7 @@ struct GameTests {
         #expect(game.status == .failed(answer: "持ち駒の金を３二に打つ"))
         #expect(game.revealedAnswer == Move(from: nil, to: answerSquare, kind: .gold))
         #expect(game.position.sfenBoard == start)
+        #expect(game.mistakes == 1)  // 盤を揺らす
 
         game.reset()
         #expect(game.status == .playing)
