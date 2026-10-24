@@ -50,10 +50,11 @@ struct TutorialView: View {
         }
     }
 
-    // 縦に 7 段を並べ、1 段ずつ止めながらスクロールする
+    // 縦に 7 段を並べ、1 段ずつ止めながらスクロールする。
+    // 画面に近い段だけを作る（全部の段の盤と演出を一度に作ると重い）
     private var pages: some View {
         ScrollView(.vertical) {
-            VStack(spacing: 0) {
+            LazyVStack(spacing: 0) {
                 ForEach(Array(stages.enumerated()), id: \.offset) { i, stage in
                     StagePage(stage: stage, total: stages.count,
                               previousStars: session.tutorialStars[i],
