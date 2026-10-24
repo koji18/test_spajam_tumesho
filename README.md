@@ -46,7 +46,7 @@ open Tsumesho.xcodeproj
 1. Xcode で TARGETS の「Tsumesho」→「Signing & Capabilities」を開く
 2. 「Team」で「Add Account…」から自分の Apple ID でサインインし、「（自分の名前）(Personal Team)」を選ぶ
 3. 手順 2 のあと、Build Settings の「Development Team」に出る10桁の Team ID を、`Config/Local.xcconfig` の `DEVELOPMENT_TEAM` に書く
-   - 「Bundle ID がすでに使われています」と出たら、同じファイルに `PRODUCT_BUNDLE_IDENTIFIER = com.自分の名前.tsumesho` のように自分用の ID を書く
+   - 「Bundle ID がすでに使われています」と出たら、同じファイルに `PRODUCT_BUNDLE_IDENTIFIER = com.yourname.tsumesho` のように自分用の ID を書く（英数字・ハイフン・ピリオドだけ。日本語は使えません）
 4. `xcodegen generate` を実行し直す（手順 2 で Xcode の画面から選んだ Team は、ここで消えて `Local.xcconfig` の値に置き換わります）
 5. iPhone を USB でつなぎ、Xcode の上部で iPhone を選んで ▶ で実行する
 

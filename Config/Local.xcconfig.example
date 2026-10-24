@@ -5,5 +5,5 @@
 // 自分の Team ID。Xcode で Personal Team を選んだあと、Build Settings の「Development Team」で確認できる
 DEVELOPMENT_TEAM = XXXXXXXXXX
 
-// 「Bundle ID がすでに使われています」と出たら、自分用の ID に変える
-// PRODUCT_BUNDLE_IDENTIFIER = com.自分の名前.tsumesho
+// 「Bundle ID がすでに使われています」と出たら、自分用の ID に変える（英数字・ハイフン・ピリオドだけ）
+// PRODUCT_BUNDLE_IDENTIFIER = com.yourname.tsumesho
