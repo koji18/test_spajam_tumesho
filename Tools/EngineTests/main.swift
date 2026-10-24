@@ -55,15 +55,15 @@ func check(_ q: Problem, _ name: String) {
     let answers = p.mateMoves(plies: q.plies)
     expect(answers.count == 1, "\(name)：正解の初手は一つだけ")
     expect(answers.first.map { Notation.label($0, in: p) } == q.answer, "\(name)：正解は \(q.answer)")
-    let piecesInSmall = p.board.indices.allSatisfy { p.board[$0] == nil || p.isInSmallBoard($0) }
-    switch q.size {
-    case .small:
-        let inSmall: (Move) -> Bool = { p.isInSmallBoard($0.to) }
-        expect(piecesInSmall && p.mateMoves(plies: q.plies, where: inSmall) == answers, "\(name)：5×5 の範囲だけで同じ正解になる")
-    case .full where q.id != 1:  // 1 問目はどちらの盤でも同じチュートリアル用の例題
-        expect(!piecesInSmall, "\(name)：5×5 の範囲の外にも駒がある（盤の広さを使う）")
-    case .full:
-        break
+    let occupied = p.board.indices.filter { p.board[$0] != nil }
+    let span = q.size.span
+    if span < 9 {
+        let window: (Move) -> Bool = { p.isInWindow($0.to, span: span) }
+        expect(occupied.allSatisfy { p.isInWindow($0, span: span) } && p.mateMoves(plies: q.plies, where: window) == answers,
+               "\(name)：\(q.size.label) の範囲だけで同じ正解になる")
+    }
+    if q.size != .small && q.id != 1 {  // 1 問目はどの盤でも同じチュートリアル用の例題
+        expect(!occupied.allSatisfy { p.isInWindow($0, span: 5) }, "\(name)：5×5 の範囲の外にも駒がある（盤の広さを使う）")
     }
     if q.plies == 3 {
         expect(!p.forcesMate(plies: 1), "\(name)：1手では詰まない（早詰めがない）")
@@ -88,6 +88,7 @@ print("1 問目の例題")
 for size in BoardSize.allCases {
     let q = Problem.tutorial(size)
     check(q, "\(size) 1問目")
+    // 1 問目の例題はわざと簡単にしてあるので、どの盤でも 5×5 用の条件で確かめる
     expect(ProblemGenerator.evaluate(q.position, size: .small, plies: 1)?.answer == q.answer, "\(size) 1問目：問題の条件を満たす")
 }
 

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// 1 問ぶんの遊びの状態。5×5 の小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
+// 1 問ぶんの遊びの状態。9×9 より小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
 @MainActor @Observable
 final class Game {
     enum Selection: Equatable {
@@ -17,9 +17,8 @@ final class Game {
     }
 
     let problem: Problem
-    // 5×5 の盤で遊ぶ問題か。表示範囲は、3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
-    let smallBoard: Bool
-    let smallFiles: ClosedRange<Int>
+    // 表示範囲。3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
+    let windowFiles: ClosedRange<Int>
     private(set) var position: Position
     private(set) var pliesLeft: Int
     private(set) var status: Status = .playing
@@ -28,6 +27,8 @@ final class Game {
     private(set) var targets: Set<Int> = []
     private(set) var lastMove: Move?
     private(set) var hintLevel = 0
+    // この問題で使ったヒントの段階の最大。レーティングの上がり幅を減らすのに使う
+    private(set) var hintsUsed = 0
     // ヒントで光らせるマスと持ち駒。盤のマスごとに計算し直すと重いので、ヒントを押したときに一度だけ計算する
     private(set) var hintSources: Set<Int> = []
     private(set) var hintHandKinds: Set<Kind> = []
@@ -37,13 +38,15 @@ final class Game {
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
+    // 解くのにかかった時間。ページが表示されたときから数える
+    private var startedAt: Date?
+    private(set) var solvedSeconds = 0
 
     init(problem: Problem) {
         let start = problem.position
         self.problem = problem
         position = start
-        smallBoard = problem.size == .small
-        smallFiles = start.smallFiles
+        windowFiles = start.windowFiles(span: problem.size.span)
         pliesLeft = problem.plies
         message = Self.prompt(for: problem)
     }
@@ -68,14 +71,18 @@ final class Game {
 
     // MARK: 盤の大きさ
 
-    var visibleFiles: ClosedRange<Int> { smallBoard ? smallFiles : 1...9 }
-    var visibleRanks: ClosedRange<Int> { smallBoard ? Position.smallRanks : 1...9 }
+    var visibleFiles: ClosedRange<Int> { windowFiles }
+    var visibleRanks: ClosedRange<Int> { Position.windowRanks(span: problem.size.span) }
+
+    // 今が何手目か（1 手詰めは 1/1、3 手詰めは 1/3 から 3/3）
+    var currentPly: Int { problem.plies - pliesLeft + 1 }
 
     // 攻め方が指せる手を、見えているマスへの手に限る
     private var filter: ((Move) -> Bool)? {
-        guard smallBoard else { return nil }
-        let files = smallFiles
-        return { files.contains(Square.file($0.to)) && Position.smallRanks.contains(Square.rank($0.to)) }
+        guard problem.size.span < 9 else { return nil }
+        let files = windowFiles
+        let ranks = visibleRanks
+        return { files.contains(Square.file($0.to)) && ranks.contains(Square.rank($0.to)) }
     }
 
     // MARK: 1 問目の案内
@@ -97,9 +104,15 @@ final class Game {
     // MARK: ヒント
 
     // 1 回目：王手をかけられる駒を光らせる。2 回目：正解の駒と行き先だけを光らせる
+    // ページが表示されたら呼ぶ。2 回目以降は何もしない
+    func start() {
+        if startedAt == nil { startedAt = Date() }
+    }
+
     func showHint() {
         guard status == .playing, hintLevel < 2 else { return }
         hintLevel += 1
+        hintsUsed = max(hintsUsed, hintLevel)
         refreshHints()
     }
 
@@ -165,6 +178,7 @@ final class Game {
         refreshHints()
         revealedAnswer = nil
         firstMoveCaptured = false
+        startedAt = Date()
     }
 
     private func select(_ s: Selection?) {
@@ -207,6 +221,7 @@ final class Game {
         lastMove = m
         if position.isMate {
             let tesuji = firstMoveCaptured ? "捨て駒" : Notation.tesuji(m, in: before, captured: false)
+            solvedSeconds = Int(Date().timeIntervalSince(startedAt ?? Date()))
             status = .solved(tesuji: tesuji)
             message = "詰み！"
             return
@@ -224,28 +239,6 @@ final class Game {
             lastMove = reply
             status = .playing
             message = "玉方は\(replyLabel)。あと1手で詰ませよう"
-        }
-    }
-}
-
-// 連続正解数と盤の大きさの設定。問題のページをまたいで共有する
-@MainActor @Observable
-final class Session {
-    // 盤の大きさ（true で 5×5）。次に起動したときも同じ大きさで始める
-    var smallBoard = UserDefaults.standard.bool(forKey: "smallBoard") {
-        didSet { UserDefaults.standard.set(smallBoard, forKey: "smallBoard") }
-    }
-    private(set) var streak = 0
-    private(set) var best = 0
-    private(set) var solvedCount = 0
-
-    func record(solved: Bool) {
-        if solved {
-            streak += 1
-            solvedCount += 1
-            best = max(best, streak)
-        } else {
-            streak = 0
         }
     }
 }

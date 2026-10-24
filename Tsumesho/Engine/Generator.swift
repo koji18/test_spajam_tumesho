@@ -5,6 +5,8 @@
 // 「ちょうど N 手で詰む」「正解の初手が一つだけ」「最初から王手になっていない」
 // 局面だけを残す。盤の大きさで作り方を変える。
 //   5×5 用：駒を玉のまわりに置き、5×5 の範囲だけで解けることを確かめる
+//   7×7 用：飛・角・香・龍・馬は 7×7 の範囲のどこからでも利かせ、7×7 の範囲だけで解けて、
+//           5×5 の範囲の外にも駒がある局面だけを残す
 //   9×9 用：飛・角・香・龍・馬は盤のどこからでも利かせ、5×5 の範囲の外にも駒がある局面だけを残す
 
 struct SplitMix64 {
@@ -63,19 +65,19 @@ struct ProblemGenerator {
         if plies == 3 && pos.forcesMate(plies: 1) { return nil }  // 早詰め
         let answers = pos.mateMoves(plies: plies)
         guard answers.count == 1 else { return nil }  // 正解の初手は一つだけ
-        let piecesOutsideSmall = pos.board.indices.contains { pos.board[$0] != nil && !pos.isInSmallBoard($0) }
-        switch size {
-        case .small:
-            // 駒がすべて 5×5 に入り、範囲の中だけで指しても正解が同じ
-            if piecesOutsideSmall { return nil }
-            let inSmall: (Move) -> Bool = { pos.isInSmallBoard($0.to) }
-            guard pos.mateMoves(plies: plies, where: inSmall) == answers else { return nil }
-            if plies == 3 && !hasUniqueLastMove(pos, answers[0], where: inSmall) { return nil }
-        case .full:
-            // 5×5 に収まる問題は 5×5 用に任せ、盤の広さを使う問題だけを残す
-            if !piecesOutsideSmall { return nil }
-            if plies == 3 && !hasUniqueLastMove(pos, answers[0], where: nil) { return nil }
+        let occupied = pos.board.indices.filter { pos.board[$0] != nil }
+        // 盤より小さい範囲で遊ぶときは、駒がすべて範囲に入り、範囲の中だけで指しても正解が同じ
+        var filter: ((Move) -> Bool)?
+        if size.span < 9 {
+            let span = size.span
+            if !occupied.allSatisfy({ pos.isInWindow($0, span: span) }) { return nil }
+            let window: (Move) -> Bool = { pos.isInWindow($0.to, span: span) }
+            guard pos.mateMoves(plies: plies, where: window) == answers else { return nil }
+            filter = window
         }
+        // 5×5 に収まる問題は 5×5 用に任せ、7×7・9×9 では盤の広さを使う問題だけを残す
+        if size != .small && occupied.allSatisfy({ pos.isInWindow($0, span: 5) }) { return nil }
+        if plies == 3 && !hasUniqueLastMove(pos, answers[0], where: filter) { return nil }
         return Problem(id: 0, size: size, plies: plies, board: pos.sfenBoard, hand: pos.sfenAttackerHand,
                        answer: Notation.label(answers[0], in: pos))
     }
@@ -107,22 +109,29 @@ struct ProblemGenerator {
         }
         let isLongRange: (Piece) -> Bool = { [.rook, .bishop, .lance].contains($0.kind) }
 
-        // 5×5 用：玉は一〜二段。ほかの駒は玉の左右 2 筋の、玉方は三段まで・攻め方は五段まで。
-        // 9×9 用：玉は一〜三段。ほかの駒は玉の左右 2 筋の、玉方は玉の 1 段下まで・攻め方は玉の 3 段下まで。
-        //         ただし飛・角・香（成った駒も）は盤のどこにでも置く
-        let kingFile = rng.int(1...9)
-        let kingRank = size == .small ? rng.int(1...2) : rng.int(1...3)
+        // 玉は 5×5・7×7 では一〜二段、9×9 では一〜三段。
+        // 玉方の駒は玉の左右 2 筋の、5×5・7×7 では三段まで、9×9 では玉の 1 段下まで。
+        // 攻め方の駒は玉の左右 2 筋の、5×5 では五段まで、7×7 では六段まで、9×9 では玉の 3 段下まで。
+        // ただし 7×7・9×9 では、飛・角・香（成った駒も）を表示範囲のどこにでも置く
+        // 5×5・7×7 では、玉を表示範囲の右上の隅に置く。左端の筋には置かず、3 手詰めで玉が逃げても範囲の外に出ないようにする
+        let kingFile = size == .full ? rng.int(1...9) : rng.int(1...(size.span - 1))
+        let kingRank = size == .full ? rng.int(1...3) : rng.int(1...2)
         guard place(Piece(side: .white, kind: .king), files: kingFile...kingFile, ranks: kingRank...kingRank) else { return nil }
-        let near = max(1, kingFile - 2)...min(9, kingFile + 2)
-        let defenderLowest = size == .small ? 3 : kingRank + 1
-        let attackerLowest = size == .small ? 5 : kingRank + 3
+        let window = pos.windowFiles(span: size.span)
+        let near = max(window.lowerBound, kingFile - 2)...min(window.upperBound, kingFile + 2)
+        let defenderLowest = size == .full ? kingRank + 1 : 3
+        let attackerLowest = switch size {
+        case .small: 5
+        case .medium: 6
+        case .full: kingRank + 3
+        }
         for _ in 0..<rng.int(0...2) {
             guard place(Piece(side: .white, kind: rng.pick(Self.defenders)), files: near, ranks: 1...defenderLowest) else { return nil }
         }
         for _ in 0..<rng.int(1...3) {
             let p = rng.pick(Self.attackers)
-            let placed = size == .full && isLongRange(p)
-                ? place(p, files: 1...9, ranks: minRank(p)...9)
+            let placed = size != .small && isLongRange(p)
+                ? place(p, files: window, ranks: minRank(p)...size.span)
                 : place(p, files: near, ranks: minRank(p)...attackerLowest)
             guard placed else { return nil }
         }
