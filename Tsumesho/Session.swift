@@ -1,7 +1,5 @@
-import CoreHaptics
 import Foundation
 import Observation
-import UIKit
 
 enum PlayMode: String {
     case normal
@@ -45,6 +43,18 @@ struct ScoreGain {
     }
 }
 
+// 一度の正解の内訳を固定し、次の問題へ移っても同じ報酬を演出する。
+struct SolveReward: Identifiable {
+    let id = UUID()
+    let gain: ScoreGain
+    let streak: Int
+    let previousRank: String
+    let rank: String
+
+    var rankedUp: Bool { previousRank != rank }
+    var isMilestone: Bool { streak > 0 && streak.isMultiple(of: 5) }
+}
+
 // 遊び方の設定と成績。問題のページをまたいで共有し、次に起動したときも残す
 @MainActor @Observable
 final class Session {
@@ -53,6 +63,7 @@ final class Session {
     var mode: PlayMode { didSet { store.set(mode.rawValue, forKey: "mode") } }
     var boardSize: BoardSize { didSet { store.set(boardSize.rawValue, forKey: "boardSize") } }
     var hapticsOn: Bool { didSet { store.set(hapticsOn, forKey: "hapticsOn") } }
+    var soundOn: Bool { didSet { store.set(soundOn, forKey: "soundOn") } }
     // 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
@@ -68,11 +79,13 @@ final class Session {
     private(set) var displayedScore: Int
     // 数え上げている間だけ、カードの横に「+735」と出す
     private(set) var scorePopup: Int?
+    private var scoreRevealID = UUID()
 
     init() {
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
+        soundOn = store.object(forKey: "soundOn") as? Bool ?? true
         tutorialCleared = store.bool(forKey: "tutorialCleared")
         rating = store.object(forKey: "rating") as? Int ?? 1500
         streak = store.integer(forKey: "streak")
@@ -100,17 +113,27 @@ final class Session {
 
     // カードのスコアを、今の表示から累計まで約 0.8 秒で数え上げる
     func revealScore() async {
+        let revealID = UUID()
+        scoreRevealID = revealID
         let from = displayedScore
         let to = totalScore
         guard to > from else { return }
         scorePopup = to - from
         let steps = 24
         for i in 1...steps {
+            guard !Task.isCancelled, scoreRevealID == revealID else { return }
             displayedScore = from + (to - from) * i / steps
-            try? await Task.sleep(for: .milliseconds(33))
+            do { try await Task.sleep(for: .milliseconds(33)) } catch { return }
         }
+        displayedScore = to
+        do { try await Task.sleep(for: .milliseconds(600)) } catch { return }
+        guard scoreRevealID == revealID else { return }
+        scorePopup = nil
+    }
+
+    func settleScore() {
+        scoreRevealID = UUID()
         displayedScore = totalScore
-        try? await Task.sleep(for: .milliseconds(600))
         scorePopup = nil
     }
 
@@ -224,57 +247,5 @@ final class TimeTrial {
     static func format(_ seconds: TimeInterval) -> String {
         let s = Int(seconds.rounded(.up))
         return String(format: "%02d:%02d", s / 60, s % 60)
-    }
-}
-
-// 振動。設定でオフにできる
-@MainActor
-enum Haptics {
-    private static var engine: CHHapticEngine?
-
-    // 詰んだ瞬間：いちばん強い振動を約 0.6 秒続け、その上に強い「ドン」を 4 回重ねる。
-    // Core Haptics が使えない機種では、標準の振動を続けて鳴らす
-    static func mate(enabled: Bool) {
-        guard enabled else { return }
-        if playMatePattern() { return }
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: 1)
-        Task {
-            try? await Task.sleep(for: .milliseconds(120))
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
-            try? await Task.sleep(for: .milliseconds(160))
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        }
-    }
-
-    private static func playMatePattern() -> Bool {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return false }
-        do {
-            if engine == nil {
-                let e = try CHHapticEngine()
-                e.isAutoShutdownEnabled = true
-                e.resetHandler = { Task { @MainActor in engine = nil } }
-                engine = e
-            }
-            guard let engine else { return false }
-            try engine.start()
-            let strong = [
-                CHHapticEventParameter(parameterID: .hapticIntensity, value: 1),
-                CHHapticEventParameter(parameterID: .hapticSharpness, value: 1),
-            ]
-            var events = [
-                CHHapticEvent(eventType: .hapticContinuous, parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7),
-                ], relativeTime: 0, duration: 0.6),
-            ]
-            for time in [0, 0.12, 0.28, 0.45] {
-                events.append(CHHapticEvent(eventType: .hapticTransient, parameters: strong, relativeTime: time))
-            }
-            let player = try engine.makePlayer(with: CHHapticPattern(events: events, parameters: []))
-            try player.start(atTime: CHHapticTimeImmediate)
-            return true
-        } catch {
-            return false
-        }
     }
 }

@@ -229,8 +229,12 @@ struct SettingsView: View {
             List {
                 Section {
                     Toggle("振動", isOn: $session.hapticsOn).tint(Theme.neonCyan)
+                    Toggle("効果音", isOn: $session.soundOn).tint(Theme.neonCyan)
                 } footer: {
-                    Text("詰んだとき、駒を動かしたとき、間違えたときに振動します")
+                    Text("駒の着地・正解・連勝・昇段に合わせて反応します。効果音はマナーモードでは鳴りません。")
+                }
+                Section {
+                    NavigationLink("演出を試す") { FeedbackPreviewView() }
                 }
                 Section {
                     Button("遊び方をもう一度見る", action: onShowTutorial)

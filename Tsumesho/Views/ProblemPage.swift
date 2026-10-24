@@ -4,13 +4,13 @@ import SwiftUI
 struct ProblemPage: View {
     let problem: Problem
     let insets: EdgeInsets
-    let onSolved: (_ seconds: Int, _ tesuji: String?) -> Void
+    let onSolved: (_ seconds: Int, _ tesuji: String?, _ reward: SolveReward) -> Void
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
     @Environment(\.palette) private var palette
     @State private var game: Game
 
-    init(problem: Problem, insets: EdgeInsets, onSolved: @escaping (_ seconds: Int, _ tesuji: String?) -> Void) {
+    init(problem: Problem, insets: EdgeInsets, onSolved: @escaping (_ seconds: Int, _ tesuji: String?, _ reward: SolveReward) -> Void) {
         self.problem = problem
         self.insets = insets
         self.onSolved = onSolved
@@ -28,7 +28,7 @@ struct ProblemPage: View {
                 failCard(answer)
             }
             Spacer(minLength: 0)
-            RatingCard()
+            RatingCard(problemKey: problem.key)
             controls
         }
         .padding(.horizontal, 20)
@@ -45,10 +45,12 @@ struct ProblemPage: View {
             case .solved(let tesuji):
                 trial.recordSolve(plies: problem.plies, hintsUsed: game.hintsUsed)
                 // スコアは裏で累計に足し、演出が消えてからカードで数え上げる
-                session.recordSolve(plies: problem.plies, size: problem.size,
-                                    seconds: game.solvedSeconds, hintsUsed: game.hintsUsed)
-                // 詰み演出と振動は、問題の列の上のレイヤーで出す（FeedView）
-                onSolved(game.solvedSeconds, tesuji)
+                let previousRank = session.rankBadge
+                let gain = session.recordSolve(plies: problem.plies, size: problem.size,
+                                               seconds: game.solvedSeconds, hintsUsed: game.hintsUsed)
+                let reward = SolveReward(gain: gain, streak: session.streak,
+                                         previousRank: previousRank, rank: session.rankBadge)
+                onSolved(game.solvedSeconds, tesuji, reward)
             case .failed:
                 session.recordMiss()
                 trial.recordMiss()
@@ -56,7 +58,9 @@ struct ProblemPage: View {
                 break
             }
         }
-        .sensoryFeedback(trigger: game.lastMove) { _, _ in session.hapticsOn ? .selection : nil }
+        .sensoryFeedback(trigger: game.selection) { _, selection in
+            session.hapticsOn && selection != nil ? .selection : nil
+        }
         .sensoryFeedback(trigger: game.status) { _, status in
             guard session.hapticsOn, case .failed = status else { return nil }
             return .error
@@ -282,6 +286,7 @@ struct ProblemPage: View {
 
 // レーティングと連勝数のカード
 struct RatingCard: View {
+    let problemKey: String
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
@@ -289,13 +294,7 @@ struct RatingCard: View {
         // 連勝の目盛りは 5 つ。5 連勝ごとに一周する
         let filled = session.streak == 0 ? 0 : (session.streak - 1) % 5 + 1
         HStack(spacing: 14) {
-            Text(session.rankBadge)
-                .font(.system(size: 18, weight: .heavy))
-                .foregroundStyle(palette.text)
-                .frame(width: 46, height: 46)
-                .background(Circle().fill(palette.panel))
-                .overlay(Circle().stroke(palette.badgeStroke, lineWidth: 1.5))
-                .shadow(color: Theme.neonCyan.opacity(0.6 * palette.glow), radius: 8)
+            HolographicBadge(title: session.rankBadge, size: 46)
             VStack(alignment: .leading, spacing: 0) {
                 Text("RATING").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
                 Text(verbatim: "\(session.rating)")
@@ -311,6 +310,7 @@ struct RatingCard: View {
                     .font(Theme.number(22, weight: .black))
                     .foregroundStyle(palette.accent)
                     .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 6)
+                    .anchorPreference(key: ScoreTargetKey.self, value: .bounds) { [problemKey: $0] }
                     .overlay(alignment: .topLeading) {
                         // 数え上げている間だけ、得た点を浮かべる
                         if let popup = session.scorePopup {
@@ -382,13 +382,21 @@ struct CircleButton: View {
 // 画面の背景。ネオンの見た目では、上にピンク、下にシアンのぼんやりした光を置く
 struct NeonBackdrop: View {
     @Environment(\.palette) private var palette
+    @Environment(TiltMotion.self) private var tilt
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
             palette.background
             if !palette.plain {
-                RadialGradient(colors: [Theme.neonPink.opacity(0.22), .clear], center: .topTrailing, startRadius: 0, endRadius: 460)
-                RadialGradient(colors: [Theme.neonCyan.opacity(0.2), .clear], center: .bottomLeading, startRadius: 0, endRadius: 460)
+                let x = reduceMotion ? 0 : tilt.horizontal
+                let y = reduceMotion ? 0 : tilt.vertical
+                RadialGradient(colors: [Theme.neonPink.opacity(0.26), .clear],
+                               center: UnitPoint(x: 1 - x * 0.16, y: y * 0.12),
+                               startRadius: 0, endRadius: 460)
+                RadialGradient(colors: [Theme.neonCyan.opacity(0.24), .clear],
+                               center: UnitPoint(x: -x * 0.12, y: 1 - y * 0.1),
+                               startRadius: 0, endRadius: 460)
             }
         }
         .ignoresSafeArea()

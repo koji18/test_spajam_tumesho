@@ -7,6 +7,7 @@ struct TsumeshoApp: App {
 
     init() {
         Theme.registerFonts()
+        NativeFeedback.prepare()
     }
 
     var body: some Scene {
@@ -25,6 +26,9 @@ struct TsumeshoApp: App {
 struct RootView: View {
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var tilt = TiltMotion()
     @State private var feed = ProblemFeed()
     @State private var playing = false
 
@@ -46,7 +50,12 @@ struct RootView: View {
                 .transition(.opacity)
             }
         }
+        .environment(tilt)
         .animation(.easeInOut(duration: 0.3), value: playing)
+        .task(id: scenePhase == .active && !reduceMotion) {
+            guard scenePhase == .active, !reduceMotion else { return }
+            await tilt.run()
+        }
     }
 }
 
@@ -58,6 +67,8 @@ struct FeedView: View {
 
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     // 今見ているページ。問題は problem.key、作り置きを待つページは "generating"
     @State private var currentPage: String?
@@ -67,12 +78,18 @@ struct FeedView: View {
     @State private var menuOpen = false
     @State private var showRecords = false
     @State private var showSettings = false
+    @State private var settling = false
+    @State private var rankCelebration: SolveReward?
+    @State private var scoreFlight: ScoreFlight?
+    @State private var celebrationTask: Task<Void, Never>?
+    @State private var scoreTask: Task<Void, Never>?
 
     struct Celebration: Identifiable {
         let id = UUID()
         let problem: Problem
         let seconds: Int
         let tesuji: String?
+        let reward: SolveReward
         var slid = false
     }
 
@@ -85,8 +102,8 @@ struct FeedView: View {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(problems.enumerated()), id: \.element.key) { index, problem in
-                            ProblemPage(problem: problem, insets: geo.safeAreaInsets) { seconds, tesuji in
-                                celebrate(problem, seconds: seconds, tesuji: tesuji)
+                            ProblemPage(problem: problem, insets: geo.safeAreaInsets) { seconds, tesuji, reward in
+                                celebrate(problem, seconds: seconds, tesuji: tesuji, reward: reward)
                             }
                             .containerRelativeFrame([.horizontal, .vertical])
                             .onAppear { feed.didShow(index: index, size: size) }
@@ -101,12 +118,15 @@ struct FeedView: View {
                 .scrollPosition(id: $currentPage)
                 .scrollTargetBehavior(.paging)
                 .scrollIndicators(.hidden)
+                .scrollDisabled(settling || celebration != nil || rankCelebration != nil)
+                .allowsHitTesting(!settling && celebration == nil && rankCelebration == nil)
                 .ignoresSafeArea()
                 .blur(radius: menuOpen ? 10 : 0)
 
                 TopBar(insets: geo.safeAreaInsets, menuOpen: menuOpen) {
                     withAnimation(.spring(duration: 0.3)) { menuOpen.toggle() }
                 }
+                .disabled(settling || celebration != nil || rankCelebration != nil)
 
                 if menuOpen {
                     Color.black.opacity(0.45)
@@ -128,12 +148,18 @@ struct FeedView: View {
                 }
 
                 if let c = celebration {
-                    MateEffectView(plies: c.problem.plies, seconds: c.seconds, tesuji: c.tesuji, seed: c.problem.id) {
+                    MateEffectView(plies: c.problem.plies, seconds: c.seconds, tesuji: c.tesuji, seed: c.problem.id, reward: c.reward) {
                         finishCelebration()
                     }
                     .id(c.id)
                     .transition(.opacity)
                     .zIndex(3)
+                }
+
+                if let reward = rankCelebration {
+                    RankUpView(reward: reward)
+                        .transition(.opacity)
+                        .zIndex(3.5)
                 }
 
                 if trial.finished {
@@ -147,6 +173,17 @@ struct FeedView: View {
                     .zIndex(4)
                 }
             }
+            .overlayPreferenceValue(ScoreTargetKey.self) { anchors in
+                GeometryReader { overlay in
+                    if let scoreFlight, let anchor = anchors[currentPage ?? ""] {
+                        let target = overlay[anchor]
+                        ScoreFlightView(flight: scoreFlight,
+                                        origin: CGPoint(x: overlay.size.width / 2, y: overlay.size.height * MateEffectView.centerRatio),
+                                        target: CGPoint(x: target.midX, y: target.midY))
+                    }
+                }
+                .allowsHitTesting(false)
+            }
             // 上のバーとメニューは geo.safeAreaInsets で自分で安全領域をよける
             .ignoresSafeArea()
         }
@@ -159,18 +196,27 @@ struct FeedView: View {
         }
         // タイムトライアルの持ち時間を見張り、0 になったら結果を出す
         .task(id: trial.startedAt) {
-            while trial.isRunning {
+            while trial.isRunning && !Task.isCancelled {
                 if trial.remaining() <= 0 {
                     trial.finish()
                     session.recordTimeTrial(solved: trial.solved)
                     break
                 }
-                try? await Task.sleep(for: .milliseconds(250))
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { break }
             }
         }
         .sheet(isPresented: $showRecords) { RecordsView() }
         .sheet(isPresented: $showSettings) {
             SettingsView { showSettings = false; onHome() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { NativeFeedback.stop() }
+        }
+        .onDisappear {
+            celebrationTask?.cancel()
+            scoreTask?.cancel()
+            NativeFeedback.stop()
+            session.settleScore()
         }
     }
 
@@ -193,35 +239,62 @@ struct FeedView: View {
     }
 
     // 演出を出し、少し見せてから下の列だけを次の問題へスライドさせ、最後に演出を消す
-    private func celebrate(_ problem: Problem, seconds: Int, tesuji: String?) {
-        Haptics.mate(enabled: session.hapticsOn)
-        let c = Celebration(problem: problem, seconds: seconds, tesuji: tesuji)
-        withAnimation(.easeOut(duration: 0.15)) { celebration = c }
-        Task {
-            try? await Task.sleep(for: .seconds(0.9))
-            guard celebration?.id == c.id else { return }
-            // 初回のチュートリアルを詰ませたら、演出の裏で普通の見た目からネオンの見た目に切り替える
-            if !session.tutorialCleared {
-                withAnimation(.easeInOut(duration: 0.6)) { session.tutorialCleared = true }
-            }
-            slideToNext()
-            try? await Task.sleep(for: .seconds(1.3))
-            guard celebration?.id == c.id else { return }
-            withAnimation(.easeOut(duration: 0.35)) { celebration = nil }
-            // 演出が消えたら、タイムトライアルで増えた秒数を出し、カードのスコアを数え上げる
-            Task { await trial.revealBonus() }
-            await session.revealScore()
+    private func celebrate(_ problem: Problem, seconds: Int, tesuji: String?, reward: SolveReward) {
+        celebrationTask?.cancel()
+        scoreTask?.cancel()
+        scoreFlight = nil
+        let c = Celebration(problem: problem, seconds: seconds, tesuji: tesuji, reward: reward)
+        settling = true
+        celebrationTask = Task { @MainActor in
+            do {
+                // 着地と盤面の波紋を見せてから、全面の詰み演出へつなぐ。
+                try await Task.sleep(for: .milliseconds(reduceMotion ? 120 : 620))
+                settling = false
+                NativeFeedback.play(.mate(reward.streak), sound: session.soundOn, haptics: session.hapticsOn)
+                withAnimation(.easeOut(duration: 0.15)) { celebration = c }
+                try await Task.sleep(for: .seconds(0.9))
+                guard celebration?.id == c.id else { return }
+                // 初回のチュートリアルを詰ませたら、演出の裏で普通の見た目からネオンの見た目に切り替える
+                if !session.tutorialCleared {
+                    withAnimation(.easeInOut(duration: 0.6)) { session.tutorialCleared = true }
+                }
+                slideToNext()
+                try await Task.sleep(for: .seconds(1.3))
+                guard celebration?.id == c.id else { return }
+                finishCelebration()
+            } catch { }
         }
     }
 
     // 演出をタップしたとき。まだスライドしていなければスライドさせて、すぐ演出を消す
     private func finishCelebration() {
-        guard celebration != nil else { return }
+        guard let c = celebration else { return }
+        celebrationTask?.cancel()
         if !session.tutorialCleared { session.tutorialCleared = true }
         slideToNext()
         withAnimation(.easeOut(duration: 0.3)) { celebration = nil }
-        Task { await trial.revealBonus() }
-        Task { await session.revealScore() }
+        settling = true
+        scoreTask?.cancel()
+        scoreTask = Task { @MainActor in
+            do {
+                // タップで即送りした場合も、スコアの着地点が止まるまで待つ。
+                try await Task.sleep(for: .milliseconds(550))
+                if c.reward.rankedUp {
+                    withAnimation(.easeOut(duration: 0.2)) { rankCelebration = c.reward }
+                    NativeFeedback.play(.rankUp, sound: session.soundOn, haptics: session.hapticsOn)
+                    try await Task.sleep(for: .milliseconds(1400))
+                    withAnimation(.easeOut(duration: 0.2)) { rankCelebration = nil }
+                }
+                settling = false
+                scoreFlight = ScoreFlight()
+                try await Task.sleep(for: .milliseconds(450))
+                NativeFeedback.play(.score, sound: session.soundOn, haptics: session.hapticsOn)
+                async let bonus: Void = trial.revealBonus()
+                await session.revealScore()
+                await bonus
+                scoreFlight = nil
+            } catch { }
+        }
     }
 
     // 詰んだ問題の次へ。まだできていなければ作り置きを待つページへ。一度の演出で一度だけ進める
@@ -230,7 +303,7 @@ struct FeedView: View {
               let index = problems.firstIndex(where: { $0.key == c.problem.key }) else { return }
         celebration?.slid = true
         let next = index + 1 < problems.count ? problems[index + 1].key : "generating"
-        withAnimation(.easeInOut(duration: 0.5)) { currentPage = next }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.5)) { currentPage = next }
     }
 }
 
