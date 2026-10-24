@@ -83,6 +83,7 @@ Tsumesho/
   Theme.swift             色とフォント
   TsumeshoApp.swift       最初の画面と、縦スワイプのフィードの切り替え
   Views/                  画面（最初の画面・問題・盤）
+TsumeshoTests/            アプリ側の単体テスト（Swift Testing）
 Tools/
   test.sh                 エンジンと問題の生成のテスト
 Config/
@@ -108,6 +109,17 @@ Tools/test.sh
 - 9×9 用の問題は、5×5 の範囲の外にも駒がある（盤の広さを使っている）
 
 Mac の Swift だけで動くので、Xcode やシミュレーターは要りません。
+
+### 単体テスト（アプリ側）
+
+スコアの計算、タイムトライアルの加算と減算、レーティングと保存、1 問の遊びの流れ（駒を選ぶ・正解・不正解・ヒント・3 手詰めの応手）を `TsumeshoTests/` で確かめます。Xcode で ⌘U を押すか、次のコマンドで動かします。
+
+```sh
+xcodebuild test -project Tsumesho.xcodeproj -scheme Tsumesho \
+  -destination "platform=iOS Simulator,name=<シミュレーターの名前>"
+```
+
+成績を保存するテストは、テスト専用の保存先を使うので、手元のアプリの成績は書き換えません。
 
 ## 問題の作り方
 

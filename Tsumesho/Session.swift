@@ -11,7 +11,7 @@ enum PlayMode: String {
 // 遊び方の設定と成績。問題のページをまたいで共有し、次に起動したときも残す
 @MainActor @Observable
 final class Session {
-    private let store = UserDefaults.standard
+    private let store: UserDefaults
 
     var mode: PlayMode { didSet { store.set(mode.rawValue, forKey: "mode") } }
     var boardSize: BoardSize { didSet { store.set(boardSize.rawValue, forKey: "boardSize") } }
@@ -32,8 +32,9 @@ final class Session {
     /// 数え上げている間だけ、カードの横に「+735」と出す
     private(set) var scorePopup: Int?
 
-    /// 保存してある設定と成績を読み込む
-    init() {
+    /// 保存してある設定と成績を読み込む。テストでは store にテスト専用の保存先を渡す
+    init(store: UserDefaults = .standard) {
+        self.store = store
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
