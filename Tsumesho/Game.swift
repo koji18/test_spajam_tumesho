@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// 1 問ぶんの遊びの状態。5×5 の小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
+// 1 問ぶんの遊びの状態。9×9 より小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
 @MainActor @Observable
 final class Game {
     enum Selection: Equatable {
@@ -17,9 +17,8 @@ final class Game {
     }
 
     let problem: Problem
-    // 5×5 の盤で遊ぶ問題か。表示範囲は、3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
-    let smallBoard: Bool
-    let smallFiles: ClosedRange<Int>
+    // 表示範囲。3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
+    let windowFiles: ClosedRange<Int>
     private(set) var position: Position
     private(set) var pliesLeft: Int
     private(set) var status: Status = .playing
@@ -37,13 +36,15 @@ final class Game {
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
+    // 解くのにかかった時間。ページが表示されたときから数える
+    private var startedAt: Date?
+    private(set) var solvedSeconds = 0
 
     init(problem: Problem) {
         let start = problem.position
         self.problem = problem
         position = start
-        smallBoard = problem.size == .small
-        smallFiles = start.smallFiles
+        windowFiles = start.windowFiles(span: problem.size.span)
         pliesLeft = problem.plies
         message = Self.prompt(for: problem)
     }
@@ -68,14 +69,18 @@ final class Game {
 
     // MARK: 盤の大きさ
 
-    var visibleFiles: ClosedRange<Int> { smallBoard ? smallFiles : 1...9 }
-    var visibleRanks: ClosedRange<Int> { smallBoard ? Position.smallRanks : 1...9 }
+    var visibleFiles: ClosedRange<Int> { windowFiles }
+    var visibleRanks: ClosedRange<Int> { Position.windowRanks(span: problem.size.span) }
+
+    // 今が何手目か（1 手詰めは 1/1、3 手詰めは 1/3 から 3/3）
+    var currentPly: Int { problem.plies - pliesLeft + 1 }
 
     // 攻め方が指せる手を、見えているマスへの手に限る
     private var filter: ((Move) -> Bool)? {
-        guard smallBoard else { return nil }
-        let files = smallFiles
-        return { files.contains(Square.file($0.to)) && Position.smallRanks.contains(Square.rank($0.to)) }
+        guard problem.size.span < 9 else { return nil }
+        let files = windowFiles
+        let ranks = visibleRanks
+        return { files.contains(Square.file($0.to)) && ranks.contains(Square.rank($0.to)) }
     }
 
     // MARK: 1 問目の案内
