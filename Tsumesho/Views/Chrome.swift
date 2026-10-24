@@ -212,7 +212,7 @@ struct RecordsView: View {
 
     private func stat(_ name: String, _ value: String) -> some View {
         LabeledContent(name) {
-            Text(value).font(Theme.display(16)).foregroundStyle(Theme.neonCyan)
+            Text(value).font(Theme.number(16)).foregroundStyle(Theme.neonCyan)
         }
     }
 }

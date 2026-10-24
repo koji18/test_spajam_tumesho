@@ -43,6 +43,11 @@ enum Theme {
         .custom("Orbitron", size: size).weight(weight)
     }
 
+    // 数字。Orbitron の数字は「7」が独特の形で読みにくいので、数字は丸ゴシックの太字で出し、桁の幅をそろえる
+    static func number(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        .system(size: size, weight: weight, design: .rounded).monospacedDigit()
+    }
+
     static func registerFonts() {
         for name in ["YujiBoku-Subset", "Orbitron"] {
             guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { continue }

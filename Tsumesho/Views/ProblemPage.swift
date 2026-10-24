@@ -96,7 +96,7 @@ struct ProblemPage: View {
                 if trial.isRunning {
                     TimelineView(.periodic(from: .now, by: 0.5)) { context in
                         Text(TimeTrial.format(trial.remaining(at: context.date)))
-                            .font(Theme.display(30, weight: .black))
+                            .font(Theme.number(30, weight: .black))
                             .monospacedDigit()
                             .foregroundStyle(palette.counter)
                             .shadow(color: Theme.neonPink.opacity(0.8 * palette.glow), radius: 8)
@@ -106,7 +106,7 @@ struct ProblemPage: View {
                         .foregroundStyle(palette.subText)
                 } else {
                     Text("\(game.currentPly)/\(problem.plies)")
-                        .font(Theme.display(30, weight: .black))
+                        .font(Theme.number(30, weight: .black))
                         .foregroundStyle(palette.counter)
                         .shadow(color: Theme.neonPink.opacity(0.8 * palette.glow), radius: 8)
                     Text("手目")
@@ -240,7 +240,7 @@ struct ProblemPage: View {
             .overlay(alignment: .topTrailing) {
                 if game.hintLevel > 0 {
                     Text("\(game.hintLevel)/2")
-                        .font(Theme.display(10))
+                        .font(Theme.number(10))
                         .foregroundStyle(Theme.background)
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Capsule().fill(Theme.hint))
