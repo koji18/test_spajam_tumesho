@@ -33,8 +33,11 @@ final class Game {
     private(set) var hintSources: Set<Int> = []
     private(set) var hintHandKinds: Set<Kind> = []
     private(set) var hintTargets: Set<Int> = []
-    // 間違えたときに盤で見せる正解の手
-    private(set) var revealedAnswer: Move?
+    // 間違えたときに盤で見せる正解の手。入門では、答えを見るボタンを押すまで見せない（answerOnDemand）
+    private var answerMove: Move?
+    private(set) var answerShown = false
+    var answerOnDemand = false
+    var revealedAnswer: Move? { answerOnDemand && !answerShown ? nil : answerMove }
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
@@ -167,6 +170,8 @@ final class Game {
         attempt(promote ? pending.promote : pending.stay)
     }
 
+    func showAnswer() { answerShown = true }
+
     func reset() {
         position = problem.position
         pliesLeft = problem.plies
@@ -177,7 +182,8 @@ final class Game {
         lastMove = nil
         hintLevel = 0
         refreshHints()
-        revealedAnswer = nil
+        answerMove = nil
+        answerShown = false
         firstMoveCaptured = false
         startedAt = Date()
     }
@@ -212,7 +218,8 @@ final class Game {
 
         // 間違えたら指す前の盤に戻し、正解の駒と行き先を盤で見せる
         guard answers.contains(m) else {
-            revealedAnswer = answers.first
+            answerMove = answers.first
+            answerShown = false
             let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)
             message = "残念、その手だと玉に逃げられます"

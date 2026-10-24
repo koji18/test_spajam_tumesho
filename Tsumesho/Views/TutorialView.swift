@@ -175,23 +175,22 @@ private struct StagePage: View {
         self.nextLabel = nextLabel
         self.onSolved = onSolved
         self.onNext = onNext
-        _game = State(initialValue: Game(problem: stage.problem))
+        _game = State(initialValue: Self.makeGame(stage.problem))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
                     titleBlock
                     lessonCard
                     boardWithEffect
                     statusLine
                     handRow
-                    if case .failed(let answer) = game.status { failCard(answer) }
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 14)
-                .padding(.bottom, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
@@ -209,6 +208,13 @@ private struct StagePage: View {
         }
         .sensoryFeedback(trigger: game.lastMove) { _, _ in session.hapticsOn ? .selection : nil }
         .animation(.spring(duration: 0.35), value: game.status)
+    }
+
+    // 入門では、間違えてもすぐには答えを見せず、「答えを見る」を押したときだけ見せる
+    private static func makeGame(_ problem: Problem) -> Game {
+        let game = Game(problem: problem)
+        game.answerOnDemand = true
+        return game
     }
 
     // 星は、ミスもヒントもなければ 3、どちらかなら 2、両方なら 1
@@ -283,7 +289,7 @@ private struct StagePage: View {
     // もう一度、はじめから解く。前に解いた星は残る
     private func retry() {
         advanceTask?.cancel()
-        game = Game(problem: stage.problem)
+        game = Self.makeGame(stage.problem)
         game.start()
         burstStart = nil
         sealOpacity = 0
@@ -336,7 +342,7 @@ private struct StagePage: View {
                 .fixedSize(horizontal: false, vertical: true)
             if cleared { starRow }
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 4).fill(Washi.paper.opacity(0.9)))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.kayaEdge.opacity(0.5), lineWidth: 1))
@@ -438,20 +444,30 @@ private struct StagePage: View {
         .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : ""))
     }
 
+    // 間違えたときだけ、画面の下に出す。「もう一度」で消え、「答えを見る」を押すまで正解は出さない
     private func failCard(_ answer: String) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("正解は \(answer)").font(.system(size: 15, weight: .bold)).foregroundStyle(Washi.ink)
-                Text("盤の緑の枠が正解の駒と行き先です").font(.system(size: 12)).foregroundStyle(Washi.inkSoft)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(game.answerShown ? "正解は \(answer)（盤の緑の枠）" : "残念、玉に逃げられました")
+                .font(.system(size: 14, weight: .bold)).foregroundStyle(Washi.ink)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("もう一度") { game.reset() }
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Washi.paper)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Washi.vermilion))
+                if !game.answerShown {
+                    Button("答えを見る") { game.showAnswer() }
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Washi.vermilion)
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: 1.5))
+                }
             }
-            Spacer()
-            Button("もう一度") { game.reset() }
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Washi.vermilion)
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: 1.5))
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 4).fill(Washi.paper.opacity(0.9)))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion.opacity(0.6), lineWidth: 1))
     }
@@ -482,6 +498,12 @@ private struct StagePage: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if case .failed(let answer) = game.status {
+            // 間違えたときは、スクロールしなくても読んで押せるように、画面の下に固定して出す
+            failCard(answer)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
             HStack(spacing: 28) {
                 Button { game.showHint() } label: {
