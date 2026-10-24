@@ -3,27 +3,46 @@ import AVFoundation
 /// 効果音。音量は設定で変えられ、0 なら鳴らさない
 @MainActor
 enum Sound {
-    private static var matePlayer: AVAudioPlayer?
     private static var pickPlayer: AVAudioPlayer?
+    // 詰みの音は、連勝に合わせて高さを変える。AVAudioPlayer の rate は高さを保ったまま速さだけ変えるので、
+    // 速さと高さを一緒に変える Varispeed を通して鳴らす
+    private static let engine = AVAudioEngine()
+    private static let mateNode = AVAudioPlayerNode()
+    private static let varispeed = AVAudioUnitVarispeed()
+    private static var mateBuffer: AVAudioPCMBuffer?
 
     /// 起動時に一度呼ぶ。ゲームの効果音として扱い、マナーモードのときは鳴らさず、音楽などは止めずに重ねて鳴らす
     static func prepare() {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        matePlayer = load("mate", changesPitch: true)
         pickPlayer = load("pick")
+        prepareMate()
+    }
+
+    /// mate.wav を読み込み、プレイヤー → Varispeed → ミキサーとつないでおく
+    private static func prepareMate() {
+        guard let url = Bundle.main.url(forResource: "mate", withExtension: "wav"),
+              let file = try? AVAudioFile(forReading: url),
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil else { return }
+        mateBuffer = buffer
+        engine.attach(mateNode)
+        engine.attach(varispeed)
+        engine.connect(mateNode, to: varispeed, format: buffer.format)
+        engine.connect(varispeed, to: engine.mainMixerNode, format: buffer.format)
+        engine.prepare()
     }
 
     /// 画面を離れたときと、バックグラウンドへ移ったときに止める。
     static func stop() {
-        matePlayer?.stop()
+        mateNode.stop()
+        if engine.isRunning { engine.pause() }
         pickPlayer?.stop()
     }
 
-    /// Sounds/ に入れた wav を読み込んで、すぐ鳴らせるようにしておく。changesPitch なら、鳴らす速さ（音の高さ）を変えられるようにする
-    private static func load(_ name: String, changesPitch: Bool = false) -> AVAudioPlayer? {
+    /// Sounds/ に入れた wav を読み込んで、すぐ鳴らせるようにしておく
+    private static func load(_ name: String) -> AVAudioPlayer? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "wav"),
               let player = try? AVAudioPlayer(contentsOf: url) else { return nil }
-        player.enableRate = changesPitch
         player.prepareToPlay()
         return player
     }
@@ -38,10 +57,16 @@ enum Sound {
         return Float(pow(2, Double(semitones) / 12))
     }
 
-    /// 詰んだときの音を volume（0〜1）で鳴らす。連勝 streak が続くほど高くする
+    /// 詰んだときの音を volume（0〜1）で鳴らす。連勝 streak が続くほど高くする。鳴っている途中なら頭から鳴らし直す
     static func playMate(volume: Double, streak: Int) {
-        matePlayer?.rate = mateRate(streak: streak)
-        play(matePlayer, volume: volume)
+        guard volume > 0, let buffer = mateBuffer else { return }
+        if !engine.isRunning { try? engine.start() }
+        guard engine.isRunning else { return }
+        mateNode.stop()
+        varispeed.rate = mateRate(streak: streak)
+        mateNode.volume = Float(min(1, volume))
+        mateNode.scheduleBuffer(buffer, at: nil)
+        mateNode.play()
     }
 
     /// 選ぶ音の大きさ。何度も鳴る音なので、設定の音量より控えめにする
