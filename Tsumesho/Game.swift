@@ -42,6 +42,8 @@ final class Game {
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
+    /// 3 手詰めの玉方の応手を待っている処理。盤面をリセットしたら取り消す
+    private var replyTask: Task<Void, Never>?
     /// 解くのにかかった時間。ページが表示されたときから数える
     private var startedAt: Date?
     private(set) var solvedSeconds = 0
@@ -189,6 +191,8 @@ final class Game {
         refreshHints()
         revealedAnswer = nil
         refutation = nil
+        replyTask?.cancel()
+        replyTask = nil
         firstMoveCaptured = false
         startedAt = Date()
     }
@@ -252,9 +256,11 @@ final class Game {
         pliesLeft -= 2
         status = .thinking
         message = "玉方が考えています…"
-        Task {
-            try? await Task.sleep(for: .milliseconds(700))
-            guard let reply = position.bestDefense(plies: pliesLeft, where: filter) else { return }
+        replyTask = Task {
+            // 待っているあいだに盤面をリセットされたら、応手を指さない
+            do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
+            guard !Task.isCancelled, status == .thinking,
+                  let reply = position.bestDefense(plies: pliesLeft, where: filter) else { return }
             let replyLabel = Notation.label(reply, in: position)
             firstMoveCaptured = reply.to == m.to
             position = position.playing(reply)

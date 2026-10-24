@@ -82,6 +82,24 @@ struct GameTests {
         #expect(game.message.hasPrefix("残念、玉に"))
     }
 
+    @Test func 玉方が考えているあいだにリセットしても_盤は最初のまま() async throws {
+        var generator = ProblemGenerator(seed: 7)
+        let generated = generator.next(size: .small, plies: 3, maxPieces: 7)
+        let problem = try #require(generated)
+        let game = Game(problem: problem)
+        let start = game.position.sfenBoard
+        let inWindow: (Move) -> Bool = { game.position.isInWindow($0.to, span: 5) }
+        let first = try #require(game.position.mateMoves(plies: 3, where: inWindow).first)
+        play(first, in: game)
+        #expect(game.status == .thinking)
+
+        game.reset()
+        try await Task.sleep(for: .milliseconds(1000))  // 玉方の応手を待つ時間より長く待つ
+        #expect(game.status == .playing)
+        #expect(game.position.sfenBoard == start)
+        #expect(game.lastMove == nil)
+    }
+
     @Test func ヒントは2段まで_2段目で正解の行き先が光る() {
         let game = Game(problem: tutorial)
         game.showHint()
