@@ -187,7 +187,8 @@ struct HomeDemoBoard: View {
     // 少し待つ → 飛車が滑る → 落款がドンと押される → 余韻、をくり返す。
     // 盤をタップすると token が変わり、すぐ最初からやり直す。振動は、タップして流したときだけ鳴らす
     private func loop() async {
-        let userTriggered = token > 0
+        // タップして流したときだけ振動する。くり返しの 2 周目からは、自動の実演なので振動しない
+        var userTriggered = token > 0
         var wait = userTriggered ? 350 : 1800
         while !Task.isCancelled {
             moved = false
@@ -220,6 +221,7 @@ struct HomeDemoBoard: View {
             withAnimation(.easeOut(duration: 0.25)) { moved = false; mate = false }
             mateStart = nil
             wait = 3000
+            userTriggered = false
         }
     }
 
