@@ -65,6 +65,10 @@ struct ProblemPage: View {
             }
         }
         .sensoryFeedback(trigger: game.lastMove) { _, _ in session.hapticsOn ? .selection : nil }
+        // 駒や持ち駒を選んだときに音を鳴らす（選択を外したときは鳴らさない）
+        .onChange(of: game.selection) { _, selection in
+            if selection != nil { Sound.playPick(volume: session.soundVolume) }
+        }
         // 間違えたとき（王手でない手も含む）。盤の揺れに合わせて鳴らす
         .sensoryFeedback(trigger: game.mistakes) { _, _ in session.hapticsOn ? .error : nil }
         .animation(.spring(duration: 0.35), value: game.status)

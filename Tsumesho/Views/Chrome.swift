@@ -13,7 +13,7 @@ struct TopBar: View {
         VStack(spacing: 0) {
             HStack {
                 // 今のモード。押すとメニューを開く
-                Button(action: onMenu) {
+                Button(action: openMenu) {
                     ModeIcon(mode: session.mode)
                         .foregroundStyle(palette.accent)
                         .frame(width: layout.barButton, height: layout.barButton)
@@ -27,7 +27,7 @@ struct TopBar: View {
 
                 Spacer()
 
-                Button(action: onMenu) {
+                Button(action: openMenu) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 22))
                         .foregroundStyle(menuOpen ? Theme.neonCyan : palette.text.opacity(0.85))
@@ -44,6 +44,12 @@ struct TopBar: View {
             Rectangle().fill(palette.text.opacity(0.08)).frame(height: 1)
         }
         .padding(.top, insets.top)
+    }
+
+    /// 歯車かモードのボタンを押したとき。選ぶ音を鳴らしてメニューを開く（閉じる）
+    private func openMenu() {
+        Sound.playPick(volume: session.soundVolume)
+        onMenu()
     }
 }
 
@@ -89,6 +95,7 @@ struct MenuPanel: View {
                 ForEach(BoardSize.allCases, id: \.self) { size in
                     let selected = session.boardSize == size
                     Button {
+                        Sound.playPick(volume: session.soundVolume)
                         onSize(size)
                     } label: {
                         Text(size.displayLabel)
@@ -114,9 +121,12 @@ struct MenuPanel: View {
         .shadow(color: Theme.neonCyan.opacity(0.45), radius: 18)
     }
 
-    /// メニューの 1 行。選ばれている行は金色で光らせる
+    /// メニューの 1 行。選ばれている行は金色で光らせ、押したら選ぶ音を鳴らす
     private func row<Icon: View>(title: String, selected: Bool, action: @escaping () -> Void, @ViewBuilder icon: () -> Icon) -> some View {
-        Button(action: action) {
+        Button {
+            Sound.playPick(volume: session.soundVolume)
+            action()
+        } label: {
             HStack(spacing: 18) {
                 icon().frame(width: 26)
                 Text(title).font(.system(size: 17, weight: .bold)).tracking(1)
@@ -238,7 +248,7 @@ struct SettingsView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "speaker.fill").foregroundStyle(Theme.soft)
                         Slider(value: $session.soundVolume, in: 0...1) { editing in
-                            if !editing { Sound.playMate(volume: session.soundVolume) }
+                            if !editing { Sound.playPick(volume: session.soundVolume) }
                         }
                         .tint(Theme.neonCyan)
                         .accessibilityLabel("効果音の音量")
@@ -248,7 +258,7 @@ struct SettingsView: View {
                 } header: {
                     Text("効果音の音量")
                 } footer: {
-                    Text("詰んだときに鳴ります。いちばん左にすると鳴りません。マナーモードのときは鳴りません")
+                    Text("駒を選んだときと、詰んだときに鳴ります。いちばん左にすると鳴りません。マナーモードのときは鳴りません")
                 }
                 Section {
                     Button("遊び方をもう一度見る", action: onShowTutorial)
