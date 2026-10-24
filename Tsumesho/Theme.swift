@@ -90,7 +90,12 @@ struct Palette {
     var gridLine: Color { plain ? Theme.woodLine.opacity(0.7) : Theme.gridLine }
     var boardEdge: Color { plain ? Theme.woodLine : .white.opacity(0.9) }
     var coordinate: Color { plain ? Color(red: 0.42, green: 0.39, blue: 0.33) : Theme.ink.opacity(0.75) }
-    var target: Color { plain ? Theme.woodLine : Theme.neonCyan }
+    // 動けるマス。普通の見た目では、木目の盤の上で見えるように青でしっかり塗る
+    var target: Color { plain ? Color(red: 0.16, green: 0.45, blue: 0.85) : Theme.neonCyan }
+    var targetFill: Double { plain ? 0.38 : 0.22 }
+    // 選んだ駒
+    var selection: Color { plain ? Color(red: 0.36, green: 0.22, blue: 0.08) : Theme.goldGlow }
+    var selectionFill: Double { plain ? 0.3 : 0.28 }
     var lastMove: Color { plain ? Theme.hint : Theme.neonPink }
 }
 

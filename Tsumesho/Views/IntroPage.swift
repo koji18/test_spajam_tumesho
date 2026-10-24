@@ -25,7 +25,7 @@ struct IntroPage: View {
                 }
                 rule(no: "2", title: "駒をタップすると、動けるマスが光る",
                      text: "光ったマスをタップすると指せます。持ち駒は空いているマスに打てます") {
-                    RoundedRectangle(cornerRadius: 4).fill(palette.target.opacity(0.3))
+                    RoundedRectangle(cornerRadius: 4).fill(palette.target.opacity(palette.targetFill))
                         .frame(width: 34, height: 34)
                         .overlay(KomaView(label: "金", size: 30, tone: .hand))
                 }

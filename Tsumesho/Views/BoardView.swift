@@ -172,13 +172,13 @@ struct BoardView: View {
                 Rectangle().strokeBorder(palette.gridLine, lineWidth: 0.5)
                 if isLast { Rectangle().fill(palette.lastMove.opacity(0.18)) }
                 if isTarget {
-                    RoundedRectangle(cornerRadius: 4).fill(palette.target.opacity(0.22)).padding(2)
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.target.opacity(0.9), lineWidth: 1.5).padding(2)
+                    RoundedRectangle(cornerRadius: 4).fill(palette.target.opacity(palette.targetFill)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.target.opacity(0.9), lineWidth: palette.plain ? 2 : 1.5).padding(2)
                 }
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 4).fill(palette.accent.opacity(0.28)).padding(1)
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.accent, lineWidth: 2).padding(1)
-                        .shadow(color: palette.accent.opacity(palette.glow), radius: 5)
+                    RoundedRectangle(cornerRadius: 4).fill(palette.selection.opacity(palette.selectionFill)).padding(1)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.selection, lineWidth: palette.plain ? 2.5 : 2).padding(1)
+                        .shadow(color: palette.selection.opacity(palette.glow), radius: 5)
                 }
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
