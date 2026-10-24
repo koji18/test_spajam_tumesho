@@ -6,7 +6,7 @@ import Observation
 // 今見ている問題より先に数問を作り置きしておくので、スワイプしても待たされない。
 @MainActor @Observable
 final class ProblemFeed {
-    private(set) var lists: [BoardSize: [Problem]] = [.small: [.tutorial(.small)], .full: [.tutorial(.full)]]
+    private(set) var lists = Dictionary(uniqueKeysWithValues: BoardSize.allCases.map { ($0, [Problem.tutorial($0)]) })
 
     private static let lookahead = 3
     private var wantedCount: [BoardSize: Int] = [:]

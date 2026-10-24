@@ -147,6 +147,8 @@ struct FeedView: View {
                     .zIndex(4)
                 }
             }
+            // 上のバーとメニューは geo.safeAreaInsets で自分で安全領域をよける
+            .ignoresSafeArea()
         }
         .background(Theme.background.ignoresSafeArea())
         .onChange(of: problems.count) {
