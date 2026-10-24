@@ -427,6 +427,8 @@ private struct StagePage: View {
         let selected = game.selection == .hand(item.kind)
         let guiding = game.guideHandKind == item.kind
         let hinted = game.hintHandKinds.contains(item.kind)
+        // 「答えを見る」で見せている正解が、この持ち駒を打つ手か。盤の行き先と同じ緑の枠で光らせる
+        let revealed = game.revealedAnswer.map { $0.from == nil && $0.kind == item.kind } ?? false
         return Button {
             game.tap(hand: item.kind)
         } label: {
@@ -438,6 +440,7 @@ private struct StagePage: View {
                         .stroke(selected ? Washi.vermilion : Washi.kayaEdge.opacity(0.6), lineWidth: selected ? 2.5 : 1)
                 )
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.hint, lineWidth: hinted ? 3 : 0))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.ok, lineWidth: revealed ? 3 : 0))
                 .overlay {
                     if guiding {
                         RoundedRectangle(cornerRadius: 6).stroke(Washi.vermilion, lineWidth: 3)
@@ -456,7 +459,7 @@ private struct StagePage: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : ""))
+        .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : "") + (revealed ? "、正解の駒" : ""))
     }
 
     // 間違えたとき（玉に逃げられた、王手になっていない）だけ、画面の下に出す。
