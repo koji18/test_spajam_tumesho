@@ -202,11 +202,12 @@ private struct RuleIllustration: View {
 
 private let cellSize: CGFloat = 56
 
-// 一：玉の逃げ道に ✕ がつき、詰みの印が押される
+// 一：玉の逃げ道に ✕ がつき、詰みの印が押される。形は頭金（玉の前の金を、後ろの歩が守る）
 private struct GoalIllustration: View {
     @State private var marks = 0
     @State private var sealed = false
-    private let escapes: [(Int, Int)] = [(1, 0), (3, 0), (1, 1), (2, 1), (3, 1)]
+    /// 玉の逃げ道。どれも金が押さえている
+    private let escapes: [(Int, Int)] = [(1, 0), (3, 0), (1, 1), (3, 1)]
 
     var body: some View {
         let board = MiniBoard(cell: cellSize) { EmptyView() }
@@ -221,7 +222,8 @@ private struct GoalIllustration: View {
                 }
             }
             koma("玉", upsideDown: true, size: cellSize).position(board.center(2, 0))
-            koma("金", size: cellSize).position(board.center(2, 2))
+            koma("金", size: cellSize).position(board.center(2, 1))
+            koma("歩", size: cellSize).position(board.center(2, 2))
             if sealed {
                 Text("詰")
                     .font(Theme.brush(30))
