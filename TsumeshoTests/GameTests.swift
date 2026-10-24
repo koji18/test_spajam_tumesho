@@ -100,6 +100,38 @@ struct GameTests {
         #expect(game.lastMove == nil)
     }
 
+    @Test func 打ち歩詰めになるマスを押すと_反則だと知らせる() {
+        // １一玉・２一桂（玉方）、２三金、持ち駒の歩。１二歩打は詰みになるので反則
+        let problem = Problem(id: 9, size: .small, plies: 1, board: "7nk/9/7G1/9/9/9/9/9/9", hand: "P", answer: "")
+        let game = Game(problem: problem)
+        game.tap(hand: .pawn)
+        #expect(!game.targets.contains(Square.index(file: 1, rank: 2)))
+        game.tap(square: Square.index(file: 1, rank: 2))
+        #expect(game.message.hasPrefix("打ち歩詰めは反則です"))
+        #expect(game.mistakes == 1)  // 盤を揺らす
+        #expect(game.status == .playing)
+        #expect(game.selection == .hand(.pawn))  // 歩は選んだまま
+    }
+
+    @Test func 二歩になるマスを押すと_反則だと知らせる() {
+        // ５筋に歩があるので、５三に歩は打てない
+        let problem = Problem(id: 9, size: .small, plies: 1, board: "4k4/9/9/9/4P4/9/9/9/9", hand: "P", answer: "")
+        let game = Game(problem: problem)
+        game.tap(hand: .pawn)
+        game.tap(square: Square.index(file: 5, rank: 3))
+        #expect(game.message.hasPrefix("二歩は反則です"))
+        #expect(game.mistakes == 1)
+        #expect(game.selection == .hand(.pawn))
+    }
+
+    @Test func 反則でない空きマスを押すと_選択を外すだけ() {
+        let game = Game(problem: tutorial)
+        game.tap(hand: .gold)
+        game.tap(square: Square.index(file: 3, rank: 1))  // 玉のいるマスには打てない（反則ではない）
+        #expect(game.selection == nil)
+        #expect(game.mistakes == 0)
+    }
+
     @Test func ヒントは2段まで_2段目で正解の行き先が光る() {
         let game = Game(problem: tutorial)
         game.showHint()

@@ -158,11 +158,36 @@ final class Game {
             }
             return
         }
+        // 持ち駒の歩で、反則になるマスを押したとき。理由を出して盤を揺らし、歩は選んだままにする
+        if selection == .hand(.pawn), let reason = illegalPawnDrop(at: square) {
+            mistakes += 1
+            message = reason
+            return
+        }
         if position.board[square]?.side == .black {
             select(selection == .square(square) ? nil : .square(square))
         } else {
             select(nil)
         }
+    }
+
+    /// 持ち駒の歩を square に打つと反則（二歩・打ち歩詰め）になるときの説明。反則でなければ nil
+    private func illegalPawnDrop(at square: Int) -> String? {
+        let drop = Move(from: nil, to: square, kind: .pawn)
+        guard position.board[square] == nil, filter?(drop) ?? true else { return nil }
+        let file = Square.file(square)
+        let doublePawn = (1...9).contains { rank in
+            let p = position.board[Square.index(file: file, rank: rank)]
+            return p?.side == .black && p?.kind == .pawn && p?.promoted == false
+        }
+        if doublePawn {
+            return "二歩は反則です（同じ筋に歩は2枚置けません）"
+        }
+        // 打ち歩詰め：反則の判定を外せば打てる手で、打つと詰みになる
+        if position.legalMoves(checkPawnDropMate: false).contains(drop) && !position.legalMoves().contains(drop) {
+            return "打ち歩詰めは反則です（歩を打って詰ませてはいけません）"
+        }
+        return nil
     }
 
     /// 持ち駒をタップしたとき。選ぶか、選んでいたら外す
