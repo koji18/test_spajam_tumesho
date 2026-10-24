@@ -61,6 +61,14 @@ do {
     w.turn = .white
     expect(w.legalMoves().allSatisfy { w.isInWindow($0.to, span: 5) }, "玉方も範囲の外へは動けない")
 }
+do {
+    // 5×5 では玉方の敵陣は三〜五段。三段目へ成らずに動いた手は「不成」と書く
+    var p = Position(problem: "8k/6s2/9/9/9/9/9/9/9", attackerHand: "")
+    p.span = 5
+    p.turn = .white
+    let stay = Move(from: Square.index(file: 3, rank: 2), to: Square.index(file: 3, rank: 3), kind: .silver)
+    expect(Notation.label(stay, in: p) == "３三銀不成", "5×5 で玉方の銀が三段目へ成らずに動くと「不成」")
+}
 
 // 出題する問題の条件。固定の問題にも、アプリが裏で作る問題にも同じ条件をかける
 func check(_ q: Problem, _ name: String) {

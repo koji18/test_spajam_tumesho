@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// 1 問ぶんの遊びの状態。9×9 より小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
+// 1 問ぶんの遊びの状態。9×9 より小さい盤では、見えている範囲が盤そのもの（Position.span）。
 @MainActor @Observable
 final class Game {
     enum Selection: Equatable {

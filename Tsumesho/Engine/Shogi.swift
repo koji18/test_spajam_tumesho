@@ -137,7 +137,7 @@ extension Position {
     // MARK: 指し手の生成
 
     /// rank が side にとっての敵陣（成れる段）か。玉方の敵陣は、盤のいちばん下から 3 段
-    private func inZone(_ side: Side, _ rank: Int) -> Bool { side == .black ? rank <= 3 : rank > span - 3 }
+    func inZone(_ side: Side, _ rank: Int) -> Bool { side == .black ? rank <= 3 : rank > span - 3 }
 
     /// 行き所のない駒になるマスか（歩・香は最終段、桂は最後の 2 段）
     private func isDeadEnd(_ kind: Kind, _ side: Side, _ rank: Int) -> Bool {
@@ -365,7 +365,7 @@ enum Notation {
         let at = fileLabel(Square.file(m.to)) + rankLabel(Square.rank(m.to))
         guard let from = m.from, let p = pos.board[from] else { return at + names[m.kind]! + "打" }
         let couldPromote = p.kind.canPromote && !p.promoted
-            && (p.side == .black ? min(Square.rank(from), Square.rank(m.to)) <= 3 : max(Square.rank(from), Square.rank(m.to)) >= 7)
+            && (pos.inZone(p.side, Square.rank(from)) || pos.inZone(p.side, Square.rank(m.to)))
         return at + label(p) + (m.promote ? "成" : couldPromote ? "不成" : "")
     }
 
