@@ -19,7 +19,8 @@ struct TutorialView: View {
         self.startAt = startAt
         self.onHome = onHome
         self.onFinish = onFinish
-        _current = State(initialValue: 0)
+        // 途中の段から始めるときも、最初からその段を表示する
+        _current = State(initialValue: min(max(0, startAt), TutorialStage.all.count - 1))
     }
 
     private var index: Int { current ?? 0 }
@@ -39,15 +40,6 @@ struct TutorialView: View {
         }
         .environment(\.palette, .classic)
         .animation(.easeInOut(duration: 0.4), value: finished)
-        // 開始位置は、最初のレイアウトのあとで指定し直さないとスクロールされない
-        .task {
-            let target = min(max(0, startAt), stages.count - 1)
-            guard target > 0 else { return }
-            try? await Task.sleep(for: .milliseconds(60))
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) { current = target }
-        }
     }
 
     // 縦に 7 段を並べ、1 段ずつ止めながらスクロールする。
