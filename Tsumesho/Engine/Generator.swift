@@ -113,7 +113,8 @@ struct ProblemGenerator {
         // 玉方の駒は玉の左右 2 筋の、5×5・7×7 では三段まで、9×9 では玉の 1 段下まで。
         // 攻め方の駒は玉の左右 2 筋の、5×5 では五段まで、7×7 では六段まで、9×9 では玉の 3 段下まで。
         // ただし 7×7・9×9 では、飛・角・香（成った駒も）を表示範囲のどこにでも置く
-        let kingFile = rng.int(1...9)
+        // 5×5・7×7 では、玉を表示範囲の右上の隅に置く。左端の筋には置かず、3 手詰めで玉が逃げても範囲の外に出ないようにする
+        let kingFile = size == .full ? rng.int(1...9) : rng.int(1...(size.span - 1))
         let kingRank = size == .full ? rng.int(1...3) : rng.int(1...2)
         guard place(Piece(side: .white, kind: .king), files: kingFile...kingFile, ranks: kingRank...kingRank) else { return nil }
         let window = pos.windowFiles(span: size.span)

@@ -32,9 +32,16 @@ struct Problem: Identifiable {
     var key: String { "\(size.rawValue)-\(id)" }
 
     // 1 問目はどの盤でも企画書の例題（頭金）。1 問目の操作の案内はこの問題に合わせてある。
-    // 2 問目からはアプリがその場で作る
+    // 玉が表示範囲の真ん中に来るように、盤のサイズごとに筋をずらす。2 問目からはアプリがその場で作る
     static func tutorial(_ size: BoardSize) -> Problem {
-        Problem(id: 1, size: size, plies: 1, board: "4k4/9/4P4/9/9/9/9/9/9", hand: "G", answer: "５二金打")
+        switch size {
+        case .small:
+            Problem(id: 1, size: size, plies: 1, board: "6k2/9/6P2/9/9/9/9/9/9", hand: "G", answer: "３二金打")
+        case .medium:
+            Problem(id: 1, size: size, plies: 1, board: "5k3/9/5P3/9/9/9/9/9/9", hand: "G", answer: "４二金打")
+        case .full:
+            Problem(id: 1, size: size, plies: 1, board: "4k4/9/4P4/9/9/9/9/9/9", hand: "G", answer: "５二金打")
+        }
     }
 
     // 盤上の駒と攻め方の持ち駒の数。少ないほど見た目がすっきりする
@@ -44,15 +51,12 @@ struct Problem: Identifiable {
     }
 }
 
-// 9×9 より小さい盤で遊ぶときの表示範囲。玉を中心に span 筋 × 一〜span 段を切り出し、
-// 盤の端でははみ出さないようにずらす。小さい盤の問題は、駒がすべてこの範囲に入り、
-// 範囲の中だけで指しても正解が変わらないことを確かめている。
+// 9×9 より小さい盤で遊ぶときの表示範囲。いつも右上の隅（1〜span 筋 × 一〜span 段）を切り出す。
+// 問題ごとに切り出す位置を変えると、筋の番号が問題ごとに変わってしまうため。
+// 小さい盤の問題は、駒がすべてこの範囲に入り、範囲の中だけで指しても正解が変わらないことを確かめている。
 extension Position {
     func windowFiles(span: Int) -> ClosedRange<Int> {
-        guard span < 9 else { return 1...9 }
-        let kingFile = kingSquare(.white).map(Square.file) ?? 5
-        let low = min(max(kingFile - span / 2, 1), 10 - span)
-        return low...(low + span - 1)
+        1...min(span, 9)
     }
 
     static func windowRanks(span: Int) -> ClosedRange<Int> { 1...span }

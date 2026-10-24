@@ -88,6 +88,7 @@ print("1 問目の例題")
 for size in BoardSize.allCases {
     let q = Problem.tutorial(size)
     check(q, "\(size) 1問目")
+    // 1 問目の例題はわざと簡単にしてあるので、どの盤でも 5×5 用の条件で確かめる
     expect(ProblemGenerator.evaluate(q.position, size: .small, plies: 1)?.answer == q.answer, "\(size) 1問目：問題の条件を満たす")
 }
 
