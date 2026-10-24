@@ -1,113 +1,376 @@
 import SwiftUI
+import UIKit
 
-// 説明とモード・盤サイズを選ぶホーム。狭い画面ではスクロールできる。
+// ホーム画面。和紙の上に木の盤を置き、詰みの実演を見せて「これを解くゲーム」だと伝える。
+// タイトルは縦書き、始めるボタンは大きな駒。ネオンの見た目とは別の、ホームだけの世界観にする
 struct IntroPage: View {
     let onStart: () -> Void
     @Environment(Session.self) private var session
-    @Environment(\.palette) private var palette
+    @State private var showsRules = false
+    @State private var showsPieces = false
+    @State private var bob = false
+    @State private var progress = 0.0
+    @State private var slam = 0
+    @State private var ripple = 0.0
+    @State private var pageBump: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("ツメショー").font(Theme.display(14)).tracking(2).foregroundStyle(palette.accent)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(session.mode == .zen ? "一手ずつ、\nもう一度。" : "1問1分の\n詰将棋")
-                            .font(.system(size: 40, weight: .heavy)).foregroundStyle(palette.text)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(session.mode == .zen ? "急がず、競わず、苦手な一問に向き合う。\n盤も操作も、そのままです。" : "相手の玉を、逃げられなくしたら勝ち。\n駒の動き方は覚えなくて大丈夫です。\n問題はアプリがその場で作るので、ずっと続きます。")
-                            .font(.system(size: 16))
-                            .foregroundStyle(palette.subText)
-                    }
-
-                    VStack(alignment: .leading, spacing: 18) {
-                        rule(no: "1", title: "毎回「王手」をかける",
-                             text: "王手は、次に玉を取れる状態にする手。詰将棋では王手しか指せません") {
-                            KomaView(label: "玉", upsideDown: true, size: 40, tone: .defender)
-                        }
-                        rule(no: "2", title: "駒をタップすると、動けるマスが光る",
-                             text: "光ったマスをタップすると指せます。持ち駒は空いているマスに打てます") {
-                            RoundedRectangle(cornerRadius: 4).fill(palette.target.opacity(palette.targetFill))
-                                .frame(width: 34, height: 34)
-                                .overlay(KomaView(label: "金", size: 30, tone: .hand))
-                        }
-                        rule(no: "3", title: "迷ったら「ヒント」",
-                             text: "1回目で王手をかけられる駒、2回目で正解の場所が光ります") {
-                            Image(systemName: "lightbulb.fill").font(.system(size: 26)).foregroundStyle(palette.hint)
-                        }
-                    }
-
-                    modePicker
-                    boardSizePicker
-                    if session.mode == .zen {
-                        Text("ノーマルでミスした問題を練習します。レートやスコアは変わりません。")
-                            .font(.system(size: 14)).foregroundStyle(palette.subText)
-                    }
-
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                .padding(.bottom, 20)
+            topRow
+            Spacer(minLength: 10)
+            HStack(alignment: .top, spacing: 14) {
+                HomeDemoBoard()
+                    .rotationEffect(.degrees(-2))
+                verticalTitle
             }
-            Button(action: onStart) {
-                Text("はじめる")
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(palette.accent)
-            .foregroundStyle(palette.plain ? Color.white : Theme.background)
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, 20)
+            caption
+            Spacer(minLength: 14)
+            bottomRow
         }
-        .background(NeonBackdrop())
-    }
-
-    private var modePicker: some View {
-        @Bindable var session = session
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("モード").font(.system(size: 13, weight: .bold)).foregroundStyle(palette.subText)
-            Picker("モード", selection: $session.mode) {
-                ForEach(PlayMode.allCases, id: \.self) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(PaperBackground())
+        .environment(\.palette, .classic)
+        .sheet(isPresented: $showsRules) { RulesSheet() }
+        .sheet(isPresented: $showsPieces) { PieceGuideSheet() }
+        .offset(y: pageBump)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { bob = true }
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.75).delay(0.35)) { progress = rank.fraction }
         }
     }
 
-    private var boardSizePicker: some View {
-        @Bindable var session = session
-        return VStack(alignment: .leading, spacing: 8) {
-            Text(session.mode == .zen ? "練習する盤のサイズ" : "盤のサイズ").font(.system(size: 13, weight: .bold)).foregroundStyle(palette.subText)
-            Picker("盤のサイズ", selection: $session.boardSize) {
-                ForEach(BoardSize.allCases, id: \.self) { size in
-                    Text(size.label).tag(size)
+    // MARK: 上の段（段位の札と遊び方）
+
+    private var topRow: some View {
+        HStack(alignment: .top) {
+            plaque
+            Spacer()
+            // 遊び方と駒の動きは、並べた 2 枚の木札から開く
+            VStack(alignment: .trailing, spacing: 8) {
+                Button { Sound.playPick(volume: session.soundVolume); showsRules = true } label: {
+                    FudaTag(text: "遊び方", selected: false, fontSize: 13)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("遊び方")
+                Button { Sound.playPick(volume: session.soundVolume); showsPieces = true } label: {
+                    FudaTag(text: "駒の動き", selected: false, fontSize: 13)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("駒の動き")
             }
-            .pickerStyle(.segmented)
-            if session.mode == .zen {
-                Text("このサイズでミスした問題：\(session.practice.problems(size: session.boardSize).count)問")
-                    .font(.system(size: 12)).foregroundStyle(palette.subText)
-            }
-            Text("5×5・7×7 は玉のまわりだけ、9×9 は普通の盤です。遊んでいる途中でも、右上のメニューから変えられます")
-                .font(.system(size: 12)).foregroundStyle(palette.subText)
         }
     }
 
-    private func rule<Icon: View>(no: String, title: String, text: String, @ViewBuilder icon: () -> Icon) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            icon().frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 17, weight: .bold)).foregroundStyle(palette.text)
-                Text(text).font(.system(size: 14)).foregroundStyle(palette.subText).fixedSize(horizontal: false, vertical: true)
+    // 段位を書いた木札と、次の段までのゲージ、連勝の炎
+    private var plaque: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(session.rankName)
+                    .font(Theme.koma(26))
+                    .foregroundStyle(Washi.ink)
+                CountUpText(value: session.rating, prefix: "R")
+                    .font(Theme.number(13))
+                    .foregroundStyle(Washi.inkSoft)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 3).fill(Washi.kaya)
+                    .shadow(color: .black.opacity(0.25), radius: 2, x: 1, y: 3)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Washi.kayaEdge, lineWidth: 1))
+
+            rankGauge
+            streakLine
+        }
+    }
+
+    // 次の段までのゲージ。端に近づくほど「あと少し」で押したくなる
+    private var rankGauge: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ZStack(alignment: .leading) {
+                Capsule().fill(Washi.paperDark)
+                Capsule().fill(Washi.vermilion)
+                    .frame(width: 168 * max(0.04, progress))
+            }
+            .frame(width: 168, height: 7)
+            Text(rank.text)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Washi.inkSoft)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(no). \(title)。\(text)")
+    }
+
+    // 連勝が続いている間は炎と次の倍率を出し、途切れているときは、倍率が上がることを匂わせる
+    @ViewBuilder
+    private var streakLine: some View {
+        if session.streak > 0 {
+            HStack(spacing: 6) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 15 + CGFloat(min(session.streak, 10))))
+                    .foregroundStyle(Washi.vermilion)
+                    .scaleEffect(bob ? 1.12 : 0.94, anchor: .bottom)
+                Text("\(session.streak)連勝")
+                    .font(Theme.koma(15))
+                    .foregroundStyle(Washi.ink)
+                Text("次は " + ScoreGain.format(session.nextStreakMultiplier))
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(Washi.paper)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 2).fill(Washi.vermilion))
+            }
+            .accessibilityElement(children: .combine)
+        } else if session.solvedTotal > 0 {
+            Text("連勝するほど、得点が最大3倍")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Washi.inkSoft)
+        } else {
+            Text("まずは1問、解いてみよう")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Washi.inkSoft)
+        }
+    }
+
+    /// 段位の境目と名前は Session.ranks で決める
+    private var rank: (fraction: Double, text: String) {
+        guard let next = Session.nextRank(for: session.rating) else { return (1, "最高段に到達") }
+        return (next.fraction, "\(next.rank.name)まで あと \(next.remaining)")
+    }
+
+    // MARK: 縦書きのタイトル
+
+    private var verticalTitle: some View {
+        HStack(alignment: .top, spacing: 6) {
+            VStack(spacing: 2) {
+                ForEach(Array("ツメショー".enumerated()), id: \.offset) { _, ch in
+                    Text(String(ch))
+                        .font(Theme.koma(38))
+                        .foregroundStyle(Washi.ink)
+                        .rotationEffect(.degrees(ch == "ー" ? 90 : 0))
+                        .frame(height: ch == "ー" ? 30 : nil)
+                }
+            }
+            VStack(spacing: 1) {
+                ForEach(Array("一問一分の詰将棋".enumerated()), id: \.offset) { _, ch in
+                    Text(String(ch))
+                        .font(Theme.koma(11))
+                        .foregroundStyle(Washi.vermilion)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("ツメショー。一問一分の詰将棋")
+    }
+
+    private var caption: some View {
+        Text("飛を左上へ。玉の逃げ道がなくなれば「詰み」。\n盤をタップすると、すぐ見られます。")
+            .font(.system(size: 12))
+            .foregroundStyle(Washi.inkSoft)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 18)
+    }
+
+    // MARK: 下の段（選択と、大きな駒のボタン）
+
+    // 下の段。モードの札はいつも同じ位置に置き、盤の大きさの札はその下に出す。
+    // チュートリアルでは盤の大きさを選ばないので、場所は空けたまま札だけを消す（モードの位置が動かないように）
+    private var bottomRow: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            tabGroup(title: "モード") {
+                tab("チュートリアル", selected: session.mode == .tutorial) { session.mode = .tutorial }
+                tab("ノーマル", selected: session.mode == .normal) { session.mode = .normal }
+                tab("タイム", selected: session.mode == .timeTrial) { session.mode = .timeTrial }
+            }
+            modeNote
+            HStack(alignment: .top, spacing: 14) {
+                tabGroup(title: "盤の大きさ") {
+                    ForEach(BoardSize.allCases, id: \.self) { size in
+                        tab(kanji(size), selected: session.boardSize == size) { session.boardSize = size }
+                    }
+                }
+                .opacity(session.mode == .tutorial ? 0 : 1)
+                .allowsHitTesting(session.mode != .tutorial)
+                .accessibilityHidden(session.mode == .tutorial)
+                .animation(.easeOut(duration: 0.2), value: session.mode)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                startPiece
+            }
+        }
+    }
+
+    // 選んでいるモードの一言。チュートリアルでは、いまどこまで進んだかを出す
+    @ViewBuilder
+    private var modeNote: some View {
+        let total = TutorialStage.all.count
+        let text: String = switch session.mode {
+        case .tutorial:
+            session.tutorialDone ? "\(total)段階を修了ずみ。いつでも復習できます" : "\(total)段階で学ぶ。いま \(session.tutorialSolved) / \(total) 段を修了"
+        case .normal:
+            "自分のペースで、ずっと解ける"
+        case .timeTrial:
+            session.timeTrialBest > 0 ? "60秒から。最高 \(session.timeTrialBest) 問" : "60秒から。何問解ける？"
+        }
+        Text(text)
+            .font(.system(size: 11)).foregroundStyle(Washi.inkSoft)
+            .frame(minHeight: 14, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var startCaption: String {
+        switch session.mode {
+        case .tutorial:
+            session.tutorialDone ? "もう一度" : (session.tutorialSolved > 0 ? "第\(session.tutorialNext + 1)段から" : "はじめから")
+        default:
+            session.solvedTotal > 0 ? "つづきから" : "はじめから"
+        }
+    }
+
+    private func kanji(_ size: BoardSize) -> String {
+        switch size {
+        case .small: "五"
+        case .medium: "七"
+        case .full: "九"
+        }
+    }
+
+    private func tabGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: 11, weight: .bold)).foregroundStyle(Washi.inkSoft)
+            HStack(spacing: 6) { content() }
+        }
+    }
+
+    // 木札のメニュー。選んでいる札は浮いて、朱の文字になる
+    private func tab(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            if session.hapticsOn { UISelectionFeedbackGenerator().selectionChanged() }
+            Sound.playPick(volume: session.soundVolume)
+            action()
+        } label: {
+            FudaTag(text: text, selected: selected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(text)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    // 大きな駒。押すと盤に押し込まれるように沈む
+    private var startPiece: some View {
+        Button(action: slamAndStart) {
+            VStack(spacing: 8) {
+                ZStack {
+                    KomaShape().fill(Washi.kaya)
+                    KomaShape().stroke(Washi.kayaEdge, lineWidth: 2)
+                    VStack(spacing: 0) {
+                        Text("指").font(Theme.koma(44)).foregroundStyle(Washi.ink)
+                        Text("す").font(Theme.koma(44)).foregroundStyle(Washi.vermilion)
+                    }
+                    .padding(.top, 14)
+                }
+                .frame(width: 108, height: 124)
+                .background(
+                    Circle()
+                        .stroke(Washi.vermilion, lineWidth: 6 * (1 - ripple) + 1)
+                        .frame(width: 120, height: 120)
+                        .scaleEffect(0.5 + ripple * 3)
+                        .opacity(slam == 2 ? 1 - ripple : 0)
+                )
+                .rotationEffect(.degrees(slam == 0 ? (bob ? 1.6 : -1.6) : 0))
+                .scaleEffect(slam == 1 ? 1.3 : (slam == 2 ? 0.94 : 1))
+                .offset(y: slam == 1 ? -20 : (slam == 0 && bob ? -3 : 0))
+                Text(startCaption)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Washi.inkSoft)
+            }
+        }
+        .buttonStyle(PieceButtonStyle())
+        .accessibilityLabel("指す。\(startCaption)")
+    }
+
+    // 駒を持ち上げて、盤に叩きつけてから始める。朱の輪が広がり、画面が揺れる
+    private func slamAndStart() {
+        guard slam == 0 else { return }
+        Sound.playPick(volume: session.soundVolume)
+        Task {
+            if session.hapticsOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+            withAnimation(.easeOut(duration: 0.12)) { slam = 1 }
+            try? await Task.sleep(for: .milliseconds(130))
+            withAnimation(.spring(response: 0.16, dampingFraction: 0.45)) { slam = 2 }
+            withAnimation(.easeOut(duration: 0.5)) { ripple = 1 }
+            if session.hapticsOn {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                try? await Task.sleep(for: .milliseconds(70))
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            }
+            for value: CGFloat in [7, -3, 2, 0] {
+                withAnimation(.easeOut(duration: 0.05)) { pageBump = value }
+                try? await Task.sleep(for: .milliseconds(55))
+            }
+            try? await Task.sleep(for: .milliseconds(180))
+            onStart()
+        }
+    }
+}
+
+// 数字を 0 から勢いよく数え上げる。値が変わったときも、今の表示から数え直す
+private struct CountUpText: View {
+    let value: Int
+    var prefix = ""
+    @State private var shown = 0
+
+    var body: some View {
+        Text("\(prefix)\(shown)")
+            .task(id: value) {
+                let from = shown
+                let steps = 28
+                for i in 1...steps {
+                    let t = Double(i) / Double(steps)
+                    let eased = 1 - (1 - t) * (1 - t) * (1 - t)
+                    shown = from + Int(Double(value - from) * eased)
+                    try? await Task.sleep(for: .milliseconds(24))
+                }
+                shown = value
+            }
+    }
+}
+
+// 押すと小さくなって沈み、影が縮む
+private struct PieceButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.93 : 1)
+            .offset(y: configuration.isPressed ? 4 : 0)
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.15 : 0.35),
+                    radius: configuration.isPressed ? 2 : 8, x: 0, y: configuration.isPressed ? 2 : 10)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// 和紙の地。繊維のような細い線をうっすら散らす
+struct PaperBackground: View {
+    var body: some View {
+        ZStack {
+            Washi.paper
+            Canvas { ctx, size in
+                for i in 0..<220 {
+                    let seed = Double(i)
+                    let x = (seed * 0.6180339).truncatingRemainder(dividingBy: 1) * size.width
+                    let y = (seed * 0.7548777 + 0.11).truncatingRemainder(dividingBy: 1) * size.height
+                    let length = 6 + seed.truncatingRemainder(dividingBy: 7) * 3
+                    let tilt = (seed.truncatingRemainder(dividingBy: 9) - 4) * 0.3
+                    var path = Path()
+                    path.move(to: CGPoint(x: x, y: y))
+                    path.addLine(to: CGPoint(x: x + length, y: y + length * tilt))
+                    ctx.stroke(path, with: .color(Washi.kayaSide.opacity(0.07)), lineWidth: 0.7)
+                }
+            }
+        }
+        .ignoresSafeArea()
     }
 }

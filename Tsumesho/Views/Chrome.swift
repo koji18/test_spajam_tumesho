@@ -1,23 +1,22 @@
 import SwiftUI
 
-// 画面の上に固定するバー。左に今のモード、右にメニューを開く歯車
+/// 画面の上に固定するバー。左に今のモード、右にメニューを開く歯車
 struct TopBar: View {
-    static let height: CGFloat = 72
-
     let insets: EdgeInsets
     let menuOpen: Bool
     let onMenu: () -> Void
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
+    @Environment(\.pageLayout) private var layout
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 // 今のモード。押すとメニューを開く
-                Button(action: onMenu) {
+                Button(action: openMenu) {
                     ModeIcon(mode: session.mode)
                         .foregroundStyle(palette.accent)
-                        .frame(width: 52, height: 52)
+                        .frame(width: layout.barButton, height: layout.barButton)
                         .background(Circle().fill(palette.panel.opacity(0.8)))
                         .overlay(Circle().stroke(palette.accent, lineWidth: 1.5))
                         .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 10)
@@ -28,47 +27,53 @@ struct TopBar: View {
 
                 Spacer()
 
-                Button(action: onMenu) {
+                Button(action: openMenu) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 22))
-                        .foregroundStyle(menuOpen ? (session.mode == .zen ? palette.accent : Theme.neonCyan) : palette.text.opacity(0.85))
-                        .frame(width: 52, height: 52)
+                        .foregroundStyle(menuOpen ? Theme.neonCyan : palette.text.opacity(0.85))
+                        .frame(width: layout.barButton, height: layout.barButton)
                         .background(Circle().fill(palette.panel.opacity(0.8)))
-                        .overlay(Circle().stroke(menuOpen ? (session.mode == .zen ? palette.accent : Theme.neonCyan) : palette.text.opacity(0.3), lineWidth: 1.5))
-                        .shadow(color: (session.mode == .zen ? palette.accent : Theme.neonCyan).opacity(menuOpen && session.mode != .zen ? 0.7 : 0), radius: 10)
+                        .overlay(Circle().stroke(menuOpen ? Theme.neonCyan : palette.text.opacity(0.3), lineWidth: 1.5))
+                        .shadow(color: Theme.neonCyan.opacity(menuOpen ? 0.7 : 0), radius: 10)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(menuOpen ? "メニューを閉じる" : "メニュー")
             }
             .padding(.horizontal, 20)
-            .frame(height: Self.height - 1)
+            .frame(height: layout.topBarHeight - 1)
             Rectangle().fill(palette.text.opacity(0.08)).frame(height: 1)
         }
         .padding(.top, insets.top)
     }
+
+    /// 歯車かモードのボタンを押したとき。選ぶ音を鳴らしてメニューを開く（閉じる）
+    private func openMenu() {
+        Sound.playPick(volume: session.soundVolume)
+        onMenu()
+    }
 }
 
-// モードのアイコン。ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
+/// モードのアイコン。入門は学帽、ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
 struct ModeIcon: View {
     let mode: PlayMode
     var size: CGFloat = 22
 
     var body: some View {
         switch mode {
+        case .tutorial:
+            Image(systemName: "graduationcap").font(.system(size: size))
         case .normal:
             ZStack {
                 KomaShape().stroke(lineWidth: 1.8).frame(width: size * 0.82, height: size)
                 Image(systemName: "plus").font(.system(size: size * 0.42, weight: .bold)).offset(y: size * 0.08)
             }
-        case .zen:
-            Image(systemName: "leaf").font(.system(size: size))
         case .timeTrial:
             Image(systemName: "stopwatch").font(.system(size: size))
         }
     }
 }
 
-// 歯車から開くメニュー
+/// 歯車から開くメニュー
 struct MenuPanel: View {
     let onHome: () -> Void
     let onMode: (PlayMode) -> Void
@@ -76,43 +81,34 @@ struct MenuPanel: View {
     let onSettings: () -> Void
     let onSize: (BoardSize) -> Void
     @Environment(Session.self) private var session
-    @Environment(\.palette) private var palette
-
-    private var accent: Color { session.mode == .zen ? palette.accent : Theme.goldGlow }
-    private var edge: Color { session.mode == .zen ? palette.accent : Theme.neonCyan }
-    private var ink: Color { session.mode == .zen ? palette.text : Theme.ink }
-    private var soft: Color { session.mode == .zen ? palette.subText : Theme.soft }
-    private var panel: Color { session.mode == .zen ? palette.panel : Theme.panel }
-    private var glow: Double { session.mode == .zen ? 0 : 1 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             row(title: "ホーム", selected: false, action: onHome) { Image(systemName: "house") }
+            row(title: "チュートリアル", selected: session.mode == .tutorial, action: { onMode(.tutorial) }) { ModeIcon(mode: .tutorial, size: 20) }
             row(title: "ノーマル", selected: session.mode == .normal, action: { onMode(.normal) }) { ModeIcon(mode: .normal, size: 20) }
             row(title: "タイムトライアル", selected: session.mode == .timeTrial, action: { onMode(.timeTrial) }) { ModeIcon(mode: .timeTrial, size: 20) }
-            row(title: "修行", selected: session.mode == .zen, action: { onMode(.zen) }) { ModeIcon(mode: .zen, size: 20) }
-            if session.mode != .zen {
-                row(title: "記録", selected: false, action: onRecords) { Image(systemName: "chart.bar") }
-            }
+            row(title: "記録", selected: false, action: onRecords) { Image(systemName: "chart.bar") }
             row(title: "設定", selected: false, action: onSettings) { Image(systemName: "gearshape") }
 
-            Rectangle().fill(ink.opacity(0.1)).frame(height: 1).padding(.vertical, 8)
+            Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1).padding(.vertical, 8)
 
-            Text("盤のサイズ").font(.system(size: 13, weight: .semibold)).foregroundStyle(soft).padding(.leading, 4)
+            Text("盤のサイズ").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.soft).padding(.leading, 4)
             HStack(spacing: 10) {
                 ForEach(BoardSize.allCases, id: \.self) { size in
                     let selected = session.boardSize == size
                     Button {
+                        Sound.playPick(volume: session.soundVolume)
                         onSize(size)
                     } label: {
                         Text(size.displayLabel)
                             .font(Theme.number(15))
-                            .foregroundStyle(selected ? accent : soft)
+                            .foregroundStyle(selected ? Theme.goldGlow : Theme.soft)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(selected ? accent.opacity(0.14) : Color.clear))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? accent : ink.opacity(0.2), lineWidth: selected ? 1.5 : 1))
-                            .shadow(color: accent.opacity(selected ? 0.5 * glow : 0), radius: 8)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Theme.goldGlow.opacity(0.14) : Color.clear))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? Theme.goldGlow : Color.white.opacity(0.2), lineWidth: selected ? 1.5 : 1))
+                            .shadow(color: Theme.goldGlow.opacity(selected ? 0.5 : 0), radius: 8)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("盤のサイズ \(size.label)")
@@ -123,33 +119,36 @@ struct MenuPanel: View {
         }
         .padding(16)
         .frame(width: 300)
-        .background(RoundedRectangle(cornerRadius: 24).fill(panel.opacity(0.96)))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(edge.opacity(0.75), lineWidth: 1.2))
-        .shadow(color: edge.opacity(0.45 * glow), radius: 18)
+        .background(RoundedRectangle(cornerRadius: 24).fill(Theme.panel.opacity(0.96)))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Theme.neonCyan.opacity(0.75), lineWidth: 1.2))
+        .shadow(color: Theme.neonCyan.opacity(0.45), radius: 18)
     }
 
+    /// メニューの 1 行。選ばれている行は金色で光らせ、押したら選ぶ音を鳴らす
     private func row<Icon: View>(title: String, selected: Bool, action: @escaping () -> Void, @ViewBuilder icon: () -> Icon) -> some View {
-        Button(action: action) {
+        Button {
+            Sound.playPick(volume: session.soundVolume)
+            action()
+        } label: {
             HStack(spacing: 18) {
                 icon().frame(width: 26)
                 Text(title).font(.system(size: 17, weight: .bold)).tracking(1)
                 Spacer()
-                if selected { Circle().fill(accent).frame(width: 8, height: 8) }
+                if selected { Circle().fill(Theme.goldGlow).frame(width: 8, height: 8) }
             }
-            .foregroundStyle(selected ? accent : ink.opacity(0.9))
+            .foregroundStyle(selected ? Theme.goldGlow : Theme.ink.opacity(0.9))
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(RoundedRectangle(cornerRadius: 16).fill(selected ? accent.opacity(0.1) : Color.clear))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? accent : Color.clear, lineWidth: 1.2))
-            .shadow(color: accent.opacity(selected ? 0.4 * glow : 0), radius: 8)
+            .background(RoundedRectangle(cornerRadius: 16).fill(selected ? Theme.goldGlow.opacity(0.1) : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? Theme.goldGlow : Color.clear, lineWidth: 1.2))
+            .shadow(color: Theme.goldGlow.opacity(selected ? 0.4 : 0), radius: 8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
-// タイムトライアルの時間切れ
+/// タイムトライアルの時間切れ
 struct TimeUpView: View {
     let solved: Int
     let best: Int
@@ -193,7 +192,7 @@ struct TimeUpView: View {
     }
 }
 
-// 記録
+/// 記録
 struct RecordsView: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -224,6 +223,7 @@ struct RecordsView: View {
         }
     }
 
+    /// 記録の 1 行
     private func stat(_ name: String, _ value: String) -> some View {
         LabeledContent(name) {
             Text(value).font(Theme.number(16)).foregroundStyle(Theme.neonCyan)
@@ -231,7 +231,7 @@ struct RecordsView: View {
     }
 }
 
-// 設定
+/// 設定
 struct SettingsView: View {
     let onShowTutorial: () -> Void
     @Environment(Session.self) private var session
@@ -242,9 +242,29 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
-                    Toggle("振動", isOn: $session.hapticsOn).tint(session.palette.accent)
+                    Toggle("振動", isOn: $session.hapticsOn).tint(Theme.neonCyan)
                 } footer: {
-                    Text("詰んだとき、駒を動かしたとき、間違えたときに振動します。修行モードでは振動しません")
+                    Text("駒の着地・正解・連勝・昇段に合わせて振動します。")
+                }
+                Section {
+                    NavigationLink("演出を試す") { FeedbackPreviewView() }
+                }
+                Section {
+                    // 指を離したら、その音量で一度鳴らす
+                    HStack(spacing: 12) {
+                        Image(systemName: "speaker.fill").foregroundStyle(Theme.soft)
+                        Slider(value: $session.soundVolume, in: 0...1) { editing in
+                            if !editing { Sound.playPick(volume: session.soundVolume) }
+                        }
+                        .tint(Theme.neonCyan)
+                        .accessibilityLabel("効果音の音量")
+                        .accessibilityValue("\(Int(session.soundVolume * 100))パーセント")
+                        Image(systemName: "speaker.wave.3.fill").foregroundStyle(Theme.soft)
+                    }
+                } header: {
+                    Text("効果音の音量")
+                } footer: {
+                    Text("駒を選んだときと、詰んだときに鳴ります。いちばん左にすると鳴りません。マナーモードのときは鳴りません")
                 }
                 Section {
                     Button("遊び方をもう一度見る", action: onShowTutorial)

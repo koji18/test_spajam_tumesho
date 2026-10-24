@@ -10,7 +10,7 @@ enum Side {
 }
 
 enum Kind: Int, CaseIterable {
-    // 持ち駒になる 7 種を先に並べ、rawValue を持ち駒配列の添字に使う
+    /// 持ち駒になる 7 種を先に並べ、rawValue を持ち駒配列の添字に使う
     case pawn, lance, knight, silver, gold, bishop, rook, king
 
     static let handKinds: [Kind] = [.rook, .bishop, .gold, .silver, .knight, .lance, .pawn]
@@ -38,9 +38,13 @@ struct Position {
 }
 
 enum Square {
+    /// 筋と段から盤の配列の添字を求める
     static func index(file: Int, rank: Int) -> Int { (rank - 1) * 9 + (file - 1) }
+    /// 添字から筋（1〜9）を求める
     static func file(_ i: Int) -> Int { i % 9 + 1 }
+    /// 添字から段（1〜9）を求める
     static func rank(_ i: Int) -> Int { i / 9 + 1 }
+    /// 筋と段が盤の中か
     static func onBoard(file: Int, rank: Int) -> Bool { (1...9).contains(file) && (1...9).contains(rank) }
 }
 
@@ -52,6 +56,7 @@ private let kingDirs: [Dir] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1,
 private let diagDirs: [Dir] = [(-1, -1), (1, -1), (-1, 1), (1, 1)]
 private let orthoDirs: [Dir] = [(0, -1), (-1, 0), (1, 0), (0, 1)]
 
+/// 駒が一歩で動ける方向（先手から見た向き）
 private func steps(_ p: Piece) -> [Dir] {
     if p.promoted {
         switch p.kind {
@@ -70,6 +75,7 @@ private func steps(_ p: Piece) -> [Dir] {
     }
 }
 
+/// 駒が何マスでも進める方向（香・角・飛と、その成り駒）
 private func slides(_ p: Piece) -> [Dir] {
     switch p.kind {
     case .lance where !p.promoted: return [(0, -1)]
@@ -82,7 +88,7 @@ private func slides(_ p: Piece) -> [Dir] {
 private let totalPieces = [18, 4, 4, 4, 4, 2, 2]  // 歩 香 桂 銀 金 角 飛
 
 extension Position {
-    // 盤上の駒 from が利いているマス
+    /// 盤上の駒 from が利いているマス
     func targets(from: Int) -> [Int] {
         guard let p = board[from] else { return [] }
         let sign = p.side == .black ? 1 : -1
@@ -105,10 +111,12 @@ extension Position {
         return out
     }
 
+    /// side の玉のマス。玉がなければ nil（攻め方は玉を持たない）
     func kingSquare(_ side: Side) -> Int? {
         board.firstIndex { $0?.side == side && $0?.kind == .king }
     }
 
+    /// target のマスに side の駒が利いているか
     func isAttacked(_ target: Int, by side: Side) -> Bool {
         for i in 0..<81 where board[i]?.side == side {
             if targets(from: i).contains(target) { return true }
@@ -116,6 +124,7 @@ extension Position {
         return false
     }
 
+    /// side の玉に王手がかかっているか
     func inCheck(_ side: Side) -> Bool {
         guard let k = kingSquare(side) else { return false }
         return isAttacked(k, by: side.opponent)
@@ -123,9 +132,10 @@ extension Position {
 
     // MARK: 指し手の生成
 
+    /// rank が side にとっての敵陣（成れる段）か
     private static func inZone(_ side: Side, _ rank: Int) -> Bool { side == .black ? rank <= 3 : rank >= 7 }
 
-    // 行き所のない駒になるマスか（歩・香は最終段、桂は最後の 2 段）
+    /// 行き所のない駒になるマスか（歩・香は最終段、桂は最後の 2 段）
     private static func isDeadEnd(_ kind: Kind, _ side: Side, _ rank: Int) -> Bool {
         let ahead = side == .black ? rank - 1 : 9 - rank
         switch kind {
@@ -135,6 +145,7 @@ extension Position {
         }
     }
 
+    /// file の筋に side の成っていない歩があるか（二歩の判定に使う）
     private func hasPawn(onFile file: Int, side: Side) -> Bool {
         (1...9).contains { r in
             let p = board[Square.index(file: file, rank: r)]
@@ -142,6 +153,7 @@ extension Position {
         }
     }
 
+    /// 自玉への王手を考えずに、手番の側が指せる手をすべて作る
     private func pseudoMoves() -> [Move] {
         var moves: [Move] = []
         for from in 0..<81 {
@@ -170,6 +182,7 @@ extension Position {
         return moves
     }
 
+    /// 手 m を指したあとの局面を返す。取った駒は持ち駒に加える
     func playing(_ m: Move) -> Position {
         var next = self
         if let from = m.from {
@@ -187,6 +200,7 @@ extension Position {
         return next
     }
 
+    /// 手番の側が指せる合法手。自玉に王手がかかる手と、打ち歩詰めを除く
     func legalMoves(checkPawnDropMate: Bool = true) -> [Move] {
         pseudoMoves().filter { m in
             let next = playing(m)
@@ -199,8 +213,10 @@ extension Position {
         }
     }
 
+    /// 手 m が相手の玉への王手になるか
     func givesCheck(_ m: Move) -> Bool { playing(m).inCheck(turn.opponent) }
 
+    /// 王手になる合法手。filter があれば、それを満たす手だけ
     func checkMoves(where filter: ((Move) -> Bool)? = nil) -> [Move] {
         legalMoves().filter { (filter?($0) ?? true) && givesCheck($0) }
     }
@@ -209,7 +225,7 @@ extension Position {
 
     // MARK: 詰みの探索
 
-    // plies 手以内に詰ませられる攻め方の初手をすべて返す
+    /// plies 手以内に詰ませられる攻め方の初手をすべて返す
     func mateMoves(plies: Int, where filter: ((Move) -> Bool)? = nil, firstOnly: Bool = false) -> [Move] {
         var found: [Move] = []
         for m in checkMoves(where: filter) {
@@ -225,26 +241,40 @@ extension Position {
         return found
     }
 
+    /// 攻め方の手番で、plies 手以内に必ず詰ませられるか
     func forcesMate(plies: Int, where filter: ((Move) -> Bool)? = nil) -> Bool {
         !mateMoves(plies: plies, where: filter, firstOnly: true).isEmpty
     }
 
-    // 玉方の応手を選ぶ。攻め方の詰ませ方がいちばん少なくなる手を選び、
-    // 同じなら盤上の駒を動かす手を合駒（打つ手）より優先する。
+    /// 攻め方の手 check が間違いだったときに、それを防ぐ玉方の応手を 1 つ選ぶ。
+    /// 防いだあと plies 手以内に詰ませられない応手のうち、いちばんわかりやすい防ぎ方（Notation.Defense の順）を選ぶ
+    func refutation(of check: Move, plies: Int, where filter: ((Move) -> Bool)? = nil) -> Move? {
+        let after = playing(check)
+        let refuting = after.legalMoves().filter { reply in
+            plies < 1 || !after.playing(reply).forcesMate(plies: plies, where: filter)
+        }
+        return refuting.min { a, b in
+            Notation.defense(a, after: after, check: check) < Notation.defense(b, after: after, check: check)
+        }
+    }
+
+    /// 玉方の応手を選ぶ。攻め方の詰ませ方がいちばん少なくなる手を選び、
+    /// 同じなら盤上の駒を動かす手を合駒（打つ手）より優先する。
     func bestDefense(plies: Int, where filter: ((Move) -> Bool)? = nil) -> Move? {
         legalMoves().min { a, b in
             score(a, plies, filter) < score(b, plies, filter)
         }
     }
 
+    /// 玉方の応手 r の粘り具合。攻め方の詰ませ方が少ないほど小さく、合駒は少し大きくする
     private func score(_ r: Move, _ plies: Int, _ filter: ((Move) -> Bool)?) -> Int {
         playing(r).mateMoves(plies: plies, where: filter).count * 2 + (r.from == nil ? 1 : 0)
     }
 
     // MARK: 局面の読み書き
 
-    // SFEN の盤面部分（例 "4k4/9/4P4/9/9/9/9/9/9"）と、攻め方の持ち駒（例 "G" や "2PS"）から局面を作る。
-    // 玉方は、盤上と攻め方の持ち駒にない残りの駒をすべて持つ（詰将棋のルール）。
+    /// SFEN の盤面部分（例 "4k4/9/4P4/9/9/9/9/9/9"）と、攻め方の持ち駒（例 "G" や "2PS"）から局面を作る。
+    /// 玉方は、盤上と攻め方の持ち駒にない残りの駒をすべて持つ（詰将棋のルール）。
     init(problem boardSFEN: String, attackerHand: String) {
         let letters: [Character: Kind] = ["P": .pawn, "L": .lance, "N": .knight, "S": .silver,
                                           "G": .gold, "B": .bishop, "R": .rook, "K": .king]
@@ -317,12 +347,16 @@ enum Notation {
     private static let ranks = Array("一二三四五六七八九")
     private static let files = Array("１２３４５６７８９")
 
+    /// 駒の名前。成り駒は「と」「龍」など
     static func label(_ p: Piece) -> String { p.promoted ? promotedNames[p.kind]! : names[p.kind]! }
+    /// 駒の種類の名前
     static func label(_ k: Kind) -> String { names[k]! }
+    /// 段の漢数字（一〜九）
     static func rankLabel(_ r: Int) -> String { String(ranks[r - 1]) }
+    /// 筋の全角数字（１〜９）
     static func fileLabel(_ f: Int) -> String { String(files[f - 1]) }
 
-    // 例「５二金打」「２三銀成」
+    /// 例「５二金打」「２三銀成」
     static func label(_ m: Move, in pos: Position) -> String {
         let at = fileLabel(Square.file(m.to)) + rankLabel(Square.rank(m.to))
         guard let from = m.from, let p = pos.board[from] else { return at + names[m.kind]! + "打" }
@@ -331,8 +365,8 @@ enum Notation {
         return at + label(p) + (m.promote ? "成" : couldPromote ? "不成" : "")
     }
 
-    // 初心者向けの説明。例「３三の龍を４二へ」「２三の角を３二へ動かして成る」「持ち駒の金を５二に打つ」。
-    // 「４二龍」だけだと、同じ場所へ動ける駒が 2 枚あるときにどちらかわからないため
+    /// 初心者向けの説明。例「３三の龍を４二へ」「２三の角を３二へ動かして成る」「持ち駒の金を５二に打つ」。
+    /// 「４二龍」だけだと、同じ場所へ動ける駒が 2 枚あるときにどちらかわからないため
     static func describe(_ m: Move, in pos: Position) -> String {
         let at = fileLabel(Square.file(m.to)) + rankLabel(Square.rank(m.to))
         guard let from = m.from, let p = pos.board[from] else { return "持ち駒の\(names[m.kind]!)を\(at)に打つ" }
@@ -340,7 +374,52 @@ enum Notation {
         return "\(origin)の\(label(p))を\(at)へ" + (m.promote ? "動かして成る" : "")
     }
 
-    // 手筋の名前。判定できるものだけ返す
+    /// 玉方の防ぎ方の種類。わかりやすいものほど前に並べる
+    enum Defense: Int, Comparable {
+        case kingCaptures   // 玉が王手の駒を取る
+        case captures       // ほかの駒で王手の駒を取る
+        case dropBlock      // 間に駒を打つ（合駒）
+        case moveBlock      // 間に駒を動かす
+        case kingEscapes    // 玉が逃げる
+        case other          // 王手は防いだあと、その先で詰まない（3 手詰めの初手を間違えたとき）
+
+        static func < (a: Defense, b: Defense) -> Bool { a.rawValue < b.rawValue }
+    }
+
+    /// 攻め方の手 check を指したあとの局面 after で、玉方の応手 reply がどういう防ぎ方か
+    static func defense(_ reply: Move, after: Position, check: Move) -> Defense {
+        let king = after.kingSquare(.white)
+        if reply.from == nil { return .dropBlock }
+        if reply.to == check.to { return reply.from == king ? .kingCaptures : .captures }
+        if reply.from == king { return .kingEscapes }
+        return after.inCheck(.white) ? .moveBlock : .other
+    }
+
+    /// 玉方の防ぎ方の説明。例「１二に金を打たれて防がれます（合駒）」「玉に１四の飛車を取られます」
+    static func explainDefense(_ reply: Move, after: Position, check: Move) -> String {
+        let at = fileLabel(Square.file(reply.to)) + rankLabel(Square.rank(reply.to))
+        switch defense(reply, after: after, check: check) {
+        case .kingCaptures:
+            return "玉に\(at)の\(after.board[reply.to].map(label) ?? "")を取られます"
+        case .captures:
+            return "\(origin(reply))の\(after.board[reply.from!].map(label) ?? "")で取られます"
+        case .dropBlock:
+            return "\(at)に\(names[reply.kind]!)を打たれて防がれます（合駒）"
+        case .moveBlock:
+            return "\(origin(reply))の\(after.board[reply.from!].map(label) ?? "")を\(at)に動かされて防がれます"
+        case .kingEscapes:
+            return "玉に\(at)へ逃げられます"
+        case .other:
+            return "玉方の\(label(reply, in: after))で、その先が詰みません"
+        }
+    }
+
+    private static func origin(_ m: Move) -> String {
+        guard let from = m.from else { return "" }
+        return fileLabel(Square.file(from)) + rankLabel(Square.rank(from))
+    }
+
+    /// 手筋の名前。判定できるものだけ返す
     static func tesuji(_ m: Move, in pos: Position, captured: Bool) -> String? {
         if captured { return "捨て駒" }
         guard let k = pos.kingSquare(.white), Square.rank(k) < 9 else { return nil }
