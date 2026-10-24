@@ -134,7 +134,7 @@ struct TutorialView: View {
     private func goNext(from i: Int, auto: Bool) {
         if auto && index != i { return }
         if i + 1 < stages.count {
-            withAnimation(.easeInOut(duration: 0.45)) { current = i + 1 }
+            withAnimation(.easeInOut(duration: 0.35)) { current = i + 1 }
         } else if session.tutorialDone {
             finished = true
         } else {
@@ -244,7 +244,7 @@ private struct StagePage: View {
         // 演出を見せてから、自動で次の段へ進む
         advanceTask?.cancel()
         advanceTask = Task {
-            try? await Task.sleep(for: .milliseconds(2300))
+            try? await Task.sleep(for: .milliseconds(1300))
             guard !Task.isCancelled else { return }
             onNext(true)
         }
@@ -262,8 +262,8 @@ private struct StagePage: View {
                 withAnimation(.easeOut(duration: 0.05)) { bump = value }
                 try? await Task.sleep(for: .milliseconds(55))
             }
-            try? await Task.sleep(for: .milliseconds(1100))
-            withAnimation(.easeIn(duration: 0.3)) { sealOpacity = 0 }
+            try? await Task.sleep(for: .milliseconds(700))
+            withAnimation(.easeIn(duration: 0.25)) { sealOpacity = 0 }
         }
     }
 
