@@ -23,14 +23,20 @@ struct ProblemPage: View {
         VStack(alignment: .leading, spacing: layout.spacing) {
             modeRow
             titleRow
+            // 盤は残った高さに収まる大きさになるので、盤より下の部品は高さを変えない
             BoardView(game: game)
             statusLine
             handRow
-            if case .failed(let answer) = game.status {
-                failCard(answer)
-            }
             Spacer(minLength: 0)
-            RatingCard()
+            // 間違えたときは、レーティングのカードの場所に正解のカードを出す
+            Group {
+                if case .failed(let answer) = game.status {
+                    failCard(answer)
+                } else {
+                    RatingCard()
+                }
+            }
+            .frame(height: layout.cardHeight)
             controls
         }
         .padding(.horizontal, 20)
@@ -151,8 +157,10 @@ struct ProblemPage: View {
             }
         }
         .font(.system(size: 14, weight: .semibold))
-        .lineLimit(2)
-        .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+        // 1 行に固定する。長い文は文字を小さくして収める（2 行になると盤が縮むため）
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity, minHeight: 20, maxHeight: 20, alignment: .leading)
         .animation(.default, value: game.message)
     }
 
@@ -176,11 +184,12 @@ struct ProblemPage: View {
                         handTile(item)
                     }
                 }
-                if case .hand = game.selection {
-                    Text("選択中 ・ 空きマスに打つ")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(palette.accent)
-                }
+                // いつも場所を取っておき、持ち駒を選んでいるときだけ見せる（出し入れで盤が縮まないように）
+                Text("選択中 ・ 空きマスに打つ")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.accent)
+                    .opacity(isHandSelected ? 1 : 0)
+                    .accessibilityHidden(!isHandSelected)
             }
             Spacer(minLength: 0)
         }
@@ -233,6 +242,12 @@ struct ProblemPage: View {
         .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : ""))
     }
 
+    /// 持ち駒を選んでいるか
+    private var isHandSelected: Bool {
+        if case .hand = game.selection { return true }
+        return false
+    }
+
     /// 間違えたときに見せる正解が、kind の持ち駒を打つ手か
     private func isRevealedDrop(_ kind: Kind) -> Bool {
         guard let m = game.revealedAnswer else { return false }
@@ -253,7 +268,7 @@ struct ProblemPage: View {
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .overlay(Capsule().stroke(Theme.neonPink, lineWidth: 1.5))
         }
-        .padding(14)
+        .padding(.horizontal, 14).padding(.vertical, layout.compact ? 8 : 14)
         .background(RoundedRectangle(cornerRadius: 16).fill(palette.panel.opacity(0.85)))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.neonPink.opacity(0.6), lineWidth: 1))
         .shadow(color: Theme.neonPink.opacity(0.3 * palette.glow), radius: 10)

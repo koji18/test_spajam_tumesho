@@ -25,6 +25,8 @@ struct PageLayout {
     var score: CGFloat { compact ? 18 : 22 }
     var cardPadding: CGFloat { compact ? 8 : 12 }
     var circleButton: CGFloat { compact ? 50 : 60 }
+    /// レーティングのカードと、間違えたときのカードの高さ。入れ替えても盤の大きさが変わらないように同じにする
+    var cardHeight: CGFloat { compact ? 58 : 74 }
 }
 
 private struct PageLayoutKey: EnvironmentKey {
