@@ -239,26 +239,11 @@ struct SettingsView: View {
                 } footer: {
                     Text("「最初の演出」は、1問目を詰ませた瞬間に、普通の見た目からネオンの見た目に変わる演出です")
                 }
-                Section("ライセンス") {
-                    license("Yuji Boku（毛筆体）", file: "YujiBoku-OFL")
-                    license("Orbitron（英数字）", file: "Orbitron-OFL")
-                }
             }
             .scrollContentBackground(.hidden)
             .background(NeonBackdrop())
             .navigationTitle("設定")
             .toolbar { Button("閉じる") { dismiss() } }
-        }
-    }
-
-    private func license(_ name: String, file: String) -> some View {
-        NavigationLink(name) {
-            ScrollView {
-                Text(Bundle.main.url(forResource: file, withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "")
-                    .font(.system(size: 12, design: .monospaced))
-                    .padding()
-            }
-            .navigationTitle(name)
         }
     }
 }
