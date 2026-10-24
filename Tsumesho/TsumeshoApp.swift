@@ -48,5 +48,22 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: playing)
+        .onAppear(perform: applyDebugArguments)
+    }
+
+    /// Debug ビルドだけ：起動オプションで最初の画面を飛ばす（シミュレーターで画面を確かめる用）。
+    /// 例：-startPlaying -boardSize full -neon
+    private func applyDebugArguments() {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-boardSize"), i + 1 < args.count, let size = BoardSize(rawValue: args[i + 1]) {
+            session.boardSize = size
+        }
+        if args.contains("-neon") { session.tutorialCleared = true }
+        if args.contains("-startPlaying") {
+            feed.didShow(index: 0, size: session.boardSize)
+            playing = true
+        }
+        #endif
     }
 }
