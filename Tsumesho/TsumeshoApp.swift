@@ -76,6 +76,17 @@ struct RootView: View {
             await tilt.run()
         }
         .onAppear(perform: applyDebugArguments)
+        // BGM は遊んでいるあいだだけ。ホームとバックグラウンドでは止める
+        .onChange(of: musicTrack, initial: true) { _, track in Music.play(track, volume: session.musicVolume) }
+        .onChange(of: session.musicVolume) { _, volume in Music.play(musicTrack, volume: volume) }
+    }
+
+    // 普通の見た目のあいだ（初回の問題を詰ませる前）は、ノーマルとタイムトライアルの曲を流さない。
+    // 詰ませてネオンに変わったところで、曲が流れ始める
+    private var musicTrack: Music.Track? {
+        guard playing, scenePhase == .active else { return nil }
+        let disguised = (session.mode == .normal || session.mode == .timeTrial) && !session.tutorialCleared
+        return disguised ? nil : Music.Track(mode: session.mode)
     }
 
     /// Debug ビルドだけ：起動オプションで最初の画面を飛ばす（シミュレーターで画面を確かめる用）。

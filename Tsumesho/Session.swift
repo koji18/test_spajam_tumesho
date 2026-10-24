@@ -39,6 +39,8 @@ final class Session {
     var hapticsOn: Bool { didSet { store.set(hapticsOn, forKey: "hapticsOn") } }
     /// 効果音の音量（0〜1）。0 なら鳴らさない
     var soundVolume: Double { didSet { store.set(soundVolume, forKey: "soundVolume") } }
+    /// BGM の音量（0〜1）。0 なら流さない
+    var musicVolume: Double { didSet { store.set(musicVolume, forKey: "musicVolume") } }
     /// 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
@@ -80,6 +82,7 @@ final class Session {
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
         soundVolume = store.object(forKey: "soundVolume") as? Double ?? 0.8
+        musicVolume = store.object(forKey: "musicVolume") as? Double ?? 0.6
         tutorialCleared = store.bool(forKey: "tutorialCleared")
         rating = store.object(forKey: "rating") as? Int ?? 1500
         streak = store.integer(forKey: "streak")

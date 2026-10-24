@@ -270,6 +270,20 @@ struct SettingsView: View {
                     Text("駒を選んだときと、詰んだときに鳴ります。いちばん左にすると鳴りません。マナーモードのときは鳴りません")
                 }
                 Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "music.note").foregroundStyle(Theme.soft)
+                        Slider(value: $session.musicVolume, in: 0...1)
+                            .tint(Theme.neonCyan)
+                            .accessibilityLabel("BGMの音量")
+                            .accessibilityValue("\(Int(session.musicVolume * 100))パーセント")
+                        Image(systemName: "music.note.list").foregroundStyle(Theme.soft)
+                    }
+                } header: {
+                    Text("BGMの音量")
+                } footer: {
+                    Text("問題を解いているあいだ、モードに合った曲が流れます。いちばん左にすると流れません。マナーモードのときは流れません")
+                }
+                Section {
                     Button("遊び方をもう一度見る", action: onShowTutorial)
                     Button("最初の演出をもう一度見る") {
                         // 普通の見た目に戻し、1 問目のチュートリアルを詰ませたらネオンに変わる演出をもう一度見せる
