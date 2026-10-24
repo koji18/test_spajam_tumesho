@@ -190,6 +190,9 @@ struct FeedView: View {
     private func celebrate(_ problem: Problem, seconds: Int, tesuji: String?, reward: SolveReward) {
         celebrationTask?.cancel()
         scoreTask?.cancel()
+        // 前の問題の数え上げが途中なら片づけて、「+○○」が残らないようにする。
+        // 今回の点はすでに累計に入っているので除き、演出のあとで数え上げる
+        session.settleScore(excludingPending: reward.gain.points)
         scoreFlight = nil
         let c = Celebration(problem: problem, seconds: seconds, tesuji: tesuji, reward: reward)
         settling = true

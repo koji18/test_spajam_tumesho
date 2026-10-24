@@ -54,6 +54,20 @@ struct SessionTests {
         #expect(session.scorePopup == nil)
     }
 
+    @Test func 数え上げの途中で次を詰ませても_前の表示を片づけて今回の分だけ数え上げる() async {
+        let session = Session(store: store)
+        session.recordSolve(plies: 1, size: .small, seconds: 0, hintsUsed: 0)
+        let first = session.totalScore
+        let second = session.recordSolve(plies: 1, size: .small, seconds: 0, hintsUsed: 0)
+        // 前の問題の数え上げが終わる前に、次の問題を詰ませた
+        session.settleScore(excludingPending: second.points)
+        #expect(session.displayedScore == first)
+        #expect(session.scorePopup == nil)
+        await session.revealScore()
+        #expect(session.displayedScore == session.totalScore)
+        #expect(session.scorePopup == nil)
+    }
+
     @Test func 成績と設定は保存され_次に起動したときに読み込まれる() {
         let session = Session(store: store)
         session.recordSolve(plies: 3, size: .full, seconds: 10, hintsUsed: 0)

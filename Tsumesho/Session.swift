@@ -87,9 +87,11 @@ final class Session {
         scorePopup = nil
     }
 
-    func settleScore() {
+    /// 途中の数え上げを止めて、カードのスコアを累計に合わせ、「+○○」を消す。
+    /// pending には、累計に足したがまだ数え上げていない点（詰ませた直後の問題の点）を渡す。その分はあとの revealScore で数え上げる
+    func settleScore(excludingPending pending: Int = 0) {
         scoreRevealID = UUID()
-        displayedScore = totalScore
+        displayedScore = totalScore - pending
         scorePopup = nil
     }
 
