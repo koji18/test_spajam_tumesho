@@ -184,6 +184,13 @@ struct HomeDemoBoard: View {
         token += 1
     }
 
+    /// ms ミリ秒待ってから「正解」を出す。待っているあいだに取り消されたら出さない
+    private func showVerdict(after ms: Int) async {
+        try? await Task.sleep(for: .milliseconds(ms))
+        if Task.isCancelled { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { verdict = true }
+    }
+
     // 少し待つ → 飛車が滑る → 落款がドンと押される → 余韻、をくり返す。
     // 盤をタップすると token が変わり、すぐ最初からやり直す。振動は、タップして流したときだけ鳴らす
     private func loop() async {
@@ -207,11 +214,10 @@ struct HomeDemoBoard: View {
             stampOpacity = 1
             withAnimation(.spring(response: 0.22, dampingFraction: 0.5)) { stampScale = 1 }
             if session.hapticsOn && userTriggered { Haptics.mate(enabled: true) }
-            Task {
-                try? await Task.sleep(for: .milliseconds(380))
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { verdict = true }
-            }
+            // 「正解」は落款の少しあとに出す。くり返し処理の子タスクにして、タップでやり直したら一緒に取り消す
+            async let verdictShown: Void = showVerdict(after: 380)
             await thud()
+            await verdictShown
             try? await Task.sleep(for: .milliseconds(2500))
             if Task.isCancelled { return }
             withAnimation(.easeIn(duration: 0.3)) { stampOpacity = 0; verdict = false }
