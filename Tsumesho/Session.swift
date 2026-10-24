@@ -28,6 +28,8 @@ enum PlayMode: String {
 @MainActor @Observable
 final class Session {
     private let store: UserDefaults
+    /// ノーマルでミスした問題。修行モードで解き直す
+    let practice: PracticeLibrary
 
     var mode: PlayMode { didSet { store.set(mode.rawValue, forKey: "mode") } }
     var boardSize: BoardSize { didSet { store.set(boardSize.rawValue, forKey: "boardSize") } }
@@ -66,6 +68,7 @@ final class Session {
     /// 保存してある設定と成績を読み込む。テストでは store にテスト専用の保存先を渡す
     init(store: UserDefaults = .standard) {
         self.store = store
+        practice = PracticeLibrary(store: store)
         // はじめて起動したときは、入門から始める。すでに遊んでいる人はノーマルのまま
         let played = store.integer(forKey: "solvedTotal") > 0
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? (played ? .normal : .tutorial)
