@@ -92,8 +92,8 @@ struct MenuPanel: View {
                     Button {
                         onSize(size)
                     } label: {
-                        Text(size.label)
-                            .font(Theme.display(15))
+                        Text(size.displayLabel)
+                            .font(Theme.number(15))
                             .foregroundStyle(selected ? Theme.goldGlow : Theme.soft)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)

@@ -73,8 +73,8 @@ struct ProblemPage: View {
                 .tracking(2)
                 .foregroundStyle(palette.accent)
             Spacer()
-            Text(problem.size.label)
-                .font(Theme.display(14))
+            Text(problem.size.displayLabel)
+                .font(Theme.number(14))
                 .foregroundStyle(palette.subText)
         }
     }
@@ -178,8 +178,8 @@ struct ProblemPage: View {
                 .shadow(color: Theme.goldGlow.opacity(selected ? 0.7 * palette.glow : 0), radius: 10)
                 .overlay(alignment: .topTrailing) {
                     if item.count > 1 {
-                        Text("×\(item.count)")
-                            .font(Theme.display(11))
+                        Text("x\(item.count)")
+                            .font(Theme.number(11))
                             .foregroundStyle(palette.text)
                             .padding(.horizontal, 5).padding(.vertical, 2)
                             .background(Capsule().fill(palette.panel))

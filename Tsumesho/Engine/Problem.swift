@@ -14,6 +14,8 @@ enum BoardSize: String, CaseIterable {
     }
 
     var label: String { "\(span)×\(span)" }
+    // Orbitron で出すとき用。Orbitron には「×」がなく、別のフォントで出てずれるので小文字の x にする
+    var displayLabel: String { "\(span)x\(span)" }
 }
 
 struct Problem: Identifiable {
