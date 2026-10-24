@@ -3,13 +3,6 @@ import Foundation
 import Observation
 import UIKit
 
-enum PlayMode: String {
-    case normal
-    case timeTrial
-
-    var title: String { self == .normal ? "NORMAL" : "TIME TRIAL" }
-}
-
 // 1 問を解いて得たスコアとその内訳
 struct ScoreGain {
     let points: Int
@@ -49,6 +42,7 @@ struct ScoreGain {
 @MainActor @Observable
 final class Session {
     private let store = UserDefaults.standard
+    let practice = PracticeLibrary()
 
     var mode: PlayMode { didSet { store.set(mode.rawValue, forKey: "mode") } }
     var boardSize: BoardSize { didSet { store.set(boardSize.rawValue, forKey: "boardSize") } }
@@ -56,7 +50,7 @@ final class Session {
     // 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
-    var palette: Palette { tutorialCleared ? .neon : .classic }
+    var palette: Palette { mode == .zen ? .zen : (tutorialCleared ? .neon : .classic) }
 
     private(set) var rating: Int { didSet { store.set(rating, forKey: "rating") } }
     private(set) var streak: Int { didSet { store.set(streak, forKey: "streak") } }

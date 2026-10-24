@@ -15,7 +15,7 @@ struct TsumeshoApp: App {
                 .environment(session)
                 .environment(trial)
                 .environment(\.palette, session.palette)
-                .preferredColorScheme(session.tutorialCleared ? .dark : .light)
+                .preferredColorScheme(session.palette.plain ? .light : .dark)
         }
     }
 }
@@ -31,15 +31,16 @@ struct RootView: View {
     var body: some View {
         ZStack {
             if playing {
-                FeedView(feed: feed) {
+                FeedView(feed: feed, mode: session.mode, practice: session.practice) {
                     trial.stop()
                     playing = false
                 }
+                .id(session.mode)
                 .transition(.move(edge: .bottom))
             } else {
                 IntroPage {
                     // 1 問目を解いているあいだに、2 問目からの作り置きを始めておく
-                    feed.didShow(index: 0, size: session.boardSize)
+                    if session.mode != .zen { feed.didShow(index: 0, size: session.boardSize) }
                     if session.mode == .timeTrial { trial.begin() }
                     playing = true
                 }
@@ -54,6 +55,7 @@ struct RootView: View {
 // 1 問目の例題のあとは、裏で作った問題が続く。上のバーとメニュー、詰み演出は列の上のレイヤーに出す
 struct FeedView: View {
     let feed: ProblemFeed
+    let mode: PlayMode
     let onHome: () -> Void
 
     @Environment(Session.self) private var session
@@ -67,6 +69,17 @@ struct FeedView: View {
     @State private var menuOpen = false
     @State private var showRecords = false
     @State private var showSettings = false
+    // 練習開始時に固定し、履歴の更新で問題や順序が入れ替わるのを防ぐ。
+    @State private var practiceLists: [BoardSize: [Problem]]
+    @State private var practiceRound = 0
+
+    init(feed: ProblemFeed, mode: PlayMode, practice: PracticeLibrary, onHome: @escaping () -> Void) {
+        self.feed = feed
+        self.mode = mode
+        self.onHome = onHome
+        _practiceLists = State(initialValue: Dictionary(uniqueKeysWithValues:
+            BoardSize.allCases.map { ($0, practice.problems(size: $0)) }))
+    }
 
     struct Celebration: Identifiable {
         let id = UUID()
@@ -77,25 +90,42 @@ struct FeedView: View {
     }
 
     private var size: BoardSize { session.boardSize }
-    private var problems: [Problem] { feed.problems(size) }
+    private var problems: [Problem] { mode == .zen ? practiceLists[size] ?? [] : feed.problems(size) }
+
+    private func pageID(_ problem: Problem) -> String {
+        mode == .zen ? PracticeLibrary.Entry.key(for: problem) : problem.key
+    }
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(problems.enumerated()), id: \.element.key) { index, problem in
-                            ProblemPage(problem: problem, insets: geo.safeAreaInsets) { seconds, tesuji in
+                        ForEach(Array(problems.enumerated()), id: \.offset) { index, problem in
+                            ProblemPage(problem: problem, mode: mode, insets: geo.safeAreaInsets,
+                                        onNext: mode == .zen ? { nextPractice(after: index) } : nil) { seconds, tesuji in
                                 celebrate(problem, seconds: seconds, tesuji: tesuji)
                             }
+                            .id(pageID(problem))
                             .containerRelativeFrame([.horizontal, .vertical])
-                            .onAppear { feed.didShow(index: index, size: size) }
+                            .onAppear {
+                                if mode != .zen { feed.didShow(index: index, size: size) }
+                            }
                         }
                         // 作り置きが追いつかなかったときに見えるページ。問題ができると、この前に足される
-                        GeneratingPage()
-                            .containerRelativeFrame([.horizontal, .vertical])
-                            .id("generating")
+                        if mode == .zen {
+                            PracticeEndPage(isEmpty: problems.isEmpty, size: size,
+                                            onNormal: { select(.normal) },
+                                            onRepeat: repeatPractice)
+                                .containerRelativeFrame([.horizontal, .vertical])
+                                .id("practice-end")
+                        } else {
+                            GeneratingPage()
+                                .containerRelativeFrame([.horizontal, .vertical])
+                                .id("generating")
+                        }
                     }
+                    .id("\(size.rawValue)-\(practiceRound)")
                     .scrollTargetLayout()
                 }
                 .scrollPosition(id: $currentPage)
@@ -104,7 +134,7 @@ struct FeedView: View {
                 .ignoresSafeArea()
                 .blur(radius: menuOpen ? 10 : 0)
 
-                TopBar(insets: geo.safeAreaInsets, menuOpen: menuOpen) {
+                TopBar(insets: geo.safeAreaInsets, menuOpen: menuOpen, onMode: select) {
                     withAnimation(.spring(duration: 0.3)) { menuOpen.toggle() }
                 }
 
@@ -115,7 +145,6 @@ struct FeedView: View {
                         .transition(.opacity)
                     MenuPanel(
                         onHome: { closeMenu(); onHome() },
-                        onMode: { mode in closeMenu(); select(mode) },
                         onRecords: { closeMenu(); showRecords = true },
                         onSettings: { closeMenu(); showSettings = true },
                         onSize: { newSize in closeMenu(); switchSize(to: newSize) }
@@ -150,10 +179,10 @@ struct FeedView: View {
             // 上のバーとメニューは geo.safeAreaInsets で自分で安全領域をよける
             .ignoresSafeArea()
         }
-        .background(Theme.background.ignoresSafeArea())
+        .background(session.palette.background.ignoresSafeArea())
         .onChange(of: problems.count) {
             // 作り置きを待っているあいだに問題ができたら、その問題へ進む
-            if currentPage == "generating", let last = problems.last {
+            if mode != .zen, currentPage == "generating", let last = problems.last {
                 withAnimation(.easeInOut(duration: 0.45)) { currentPage = last.key }
             }
         }
@@ -165,7 +194,7 @@ struct FeedView: View {
                     session.recordTimeTrial(solved: trial.solved)
                     break
                 }
-                try? await Task.sleep(for: .milliseconds(250))
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { break }
             }
         }
         .sheet(isPresented: $showRecords) { RecordsView() }
@@ -179,6 +208,9 @@ struct FeedView: View {
     }
 
     private func select(_ mode: PlayMode) {
+        guard mode != self.mode else { return }
+        celebration = nil
+        menuOpen = false
         session.mode = mode
         if mode == .timeTrial { trial.begin() } else { trial.stop() }
     }
@@ -188,25 +220,26 @@ struct FeedView: View {
         guard newSize != size else { return }
         lastPage[size] = currentPage
         session.boardSize = newSize
-        feed.didShow(index: 0, size: newSize)
-        currentPage = lastPage[newSize] ?? feed.problems(newSize).first?.key
+        if mode != .zen { feed.didShow(index: 0, size: newSize) }
+        currentPage = lastPage[newSize] ?? problems.first.map(pageID)
     }
 
     // 演出を出し、少し見せてから下の列だけを次の問題へスライドさせ、最後に演出を消す
     private func celebrate(_ problem: Problem, seconds: Int, tesuji: String?) {
+        guard mode != .zen else { return }
         Haptics.mate(enabled: session.hapticsOn)
         let c = Celebration(problem: problem, seconds: seconds, tesuji: tesuji)
         withAnimation(.easeOut(duration: 0.15)) { celebration = c }
         Task {
             try? await Task.sleep(for: .seconds(0.9))
-            guard celebration?.id == c.id else { return }
+            guard session.mode == mode, celebration?.id == c.id else { return }
             // 初回のチュートリアルを詰ませたら、演出の裏で普通の見た目からネオンの見た目に切り替える
             if !session.tutorialCleared {
                 withAnimation(.easeInOut(duration: 0.6)) { session.tutorialCleared = true }
             }
             slideToNext()
             try? await Task.sleep(for: .seconds(1.3))
-            guard celebration?.id == c.id else { return }
+            guard session.mode == mode, celebration?.id == c.id else { return }
             withAnimation(.easeOut(duration: 0.35)) { celebration = nil }
             // 演出が消えたら、タイムトライアルで増えた秒数を出し、カードのスコアを数え上げる
             Task { await trial.revealBonus() }
@@ -231,6 +264,17 @@ struct FeedView: View {
         celebration?.slid = true
         let next = index + 1 < problems.count ? problems[index + 1].key : "generating"
         withAnimation(.easeInOut(duration: 0.5)) { currentPage = next }
+    }
+
+    private func nextPractice(after index: Int) {
+        let next = index + 1 < problems.count ? pageID(problems[index + 1]) : "practice-end"
+        withAnimation(.easeInOut(duration: 0.3)) { currentPage = next }
+    }
+
+    private func repeatPractice() {
+        practiceRound += 1
+        lastPage = [:]
+        currentPage = problems.first.map(pageID)
     }
 }
 

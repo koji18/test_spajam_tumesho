@@ -62,17 +62,28 @@ enum Theme {
 // 詰ませた瞬間に派手な「ネオン」の見た目に切り替える
 struct Palette {
     let plain: Bool
+    var isZen = false
 
     static let neon = Palette(plain: false)
     static let classic = Palette(plain: true)
+    static let zen = Palette(plain: true, isZen: true)
 
-    var background: Color { plain ? Color(red: 0.95, green: 0.93, blue: 0.88) : Color(red: 0.03, green: 0.035, blue: 0.06) }
+    // 修行は和紙・墨・苔色・弁柄を使い、発光を抑える。
+    private var moss: Color { Color(red: 0.30, green: 0.38, blue: 0.27) }
+    var enemy: Color { isZen ? Color(red: 0.55, green: 0.29, blue: 0.24) : Theme.neonPink }
+    var hint: Color { isZen ? Color(red: 0.54, green: 0.38, blue: 0.17) : Theme.hint }
+    var success: Color { isZen ? moss : Theme.ok }
+    var pieceFill: Color { isZen ? Color(red: 0.90, green: 0.84, blue: 0.70) : Theme.piece }
+    var pieceInk: Color { Theme.pieceInk }
+    var promotedInk: Color { isZen ? enemy : Color(red: 0.72, green: 0.12, blue: 0.12) }
+
+    var background: Color { isZen ? Color(red: 0.92, green: 0.91, blue: 0.86) : plain ? Color(red: 0.95, green: 0.93, blue: 0.88) : Color(red: 0.03, green: 0.035, blue: 0.06) }
     var text: Color { plain ? Theme.pieceInk : .white }
     var subText: Color { plain ? Color(red: 0.42, green: 0.39, blue: 0.33) : Theme.soft }
-    var accent: Color { plain ? Theme.woodLine : Theme.goldGlow }
+    var accent: Color { isZen ? moss : plain ? Theme.woodLine : Theme.goldGlow }
     var counter: Color { plain ? Theme.pieceInk : Theme.neonPink }
     var rating: Color { plain ? Theme.pieceInk : Color(red: 0.75, green: 0.97, blue: 1.0) }
-    var panel: Color { plain ? .white : Theme.panel }
+    var panel: Color { isZen ? Color(red: 0.87, green: 0.86, blue: 0.79) : plain ? .white : Theme.panel }
     var panelStroke: Color { plain ? .black.opacity(0.12) : .white.opacity(0.14) }
     var badgeStroke: Color { plain ? Theme.woodLine : Theme.neonCyan }
     var resetButton: Color { plain ? Theme.pieceInk : Theme.neonCyan }
@@ -81,17 +92,17 @@ struct Palette {
     var glow: Double { plain ? 0 : 1 }
 
     // 盤
-    var boardFill: Color { plain ? Theme.wood : .black }
+    var boardFill: Color { isZen ? Color(red: 0.78, green: 0.69, blue: 0.51) : plain ? Theme.wood : .black }
     var gridLine: Color { plain ? Theme.woodLine.opacity(0.7) : Theme.gridLine }
     var boardEdge: Color { plain ? Theme.woodLine : .white.opacity(0.9) }
     var coordinate: Color { plain ? Color(red: 0.42, green: 0.39, blue: 0.33) : Theme.ink.opacity(0.75) }
     // 動けるマス。普通の見た目では、木目の盤の上で見えるように青でしっかり塗る
-    var target: Color { plain ? Color(red: 0.16, green: 0.45, blue: 0.85) : Theme.neonCyan }
+    var target: Color { isZen ? moss : plain ? Color(red: 0.16, green: 0.45, blue: 0.85) : Theme.neonCyan }
     var targetFill: Double { plain ? 0.38 : 0.22 }
     // 選んだ駒
     var selection: Color { plain ? Color(red: 0.36, green: 0.22, blue: 0.08) : Theme.goldGlow }
     var selectionFill: Double { plain ? 0.3 : 0.28 }
-    var lastMove: Color { plain ? Theme.hint : Theme.neonPink }
+    var lastMove: Color { isZen ? moss : plain ? Theme.hint : Theme.neonPink }
 }
 
 private struct PaletteKey: EnvironmentKey {

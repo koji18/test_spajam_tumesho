@@ -1,5 +1,5 @@
 // 問題を遊ぶ盤の大きさ。大きさごとに作り方が違う（Generator.swift）
-enum BoardSize: String, CaseIterable {
+enum BoardSize: String, CaseIterable, Codable {
     case small   // 玉のまわりの 5×5
     case medium  // 玉のまわりの 7×7
     case full    // 普通の 9×9
@@ -18,7 +18,7 @@ enum BoardSize: String, CaseIterable {
     var displayLabel: String { "\(span)x\(span)" }
 }
 
-struct Problem: Identifiable {
+struct Problem: Identifiable, Codable {
     var id: Int
     let size: BoardSize
     let plies: Int

@@ -33,6 +33,8 @@ final class Game {
     private(set) var hintSources: Set<Int> = []
     private(set) var hintHandKinds: Set<Kind> = []
     private(set) var hintTargets: Set<Int> = []
+    // リセットをまたいで数える。王手にならない手も含め、ミスを漏れなく保存するために使う。
+    private(set) var mistakeCount = 0
     // 間違えたときに盤で見せる正解の手
     private(set) var revealedAnswer: Move?
     var pendingPromotion: (promote: Move, stay: Move)?
@@ -201,6 +203,7 @@ final class Game {
     private func attempt(_ m: Move) {
         select(nil)
         guard position.givesCheck(m) else {
+            mistakeCount += 1
             message = "王手になっていません。詰将棋は毎回王手をかけます"
             return
         }
@@ -211,6 +214,7 @@ final class Game {
 
         // 間違えたら指す前の盤に戻し、正解の駒と行き先を盤で見せる
         guard answers.contains(m) else {
+            mistakeCount += 1
             revealedAnswer = answers.first
             let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)

@@ -35,10 +35,10 @@ struct KomaView: View {
     private var classic: some View {
         Text(label)
             .font(Theme.koma(size * 0.5))
-            .foregroundStyle(promoted ? Color(red: 0.72, green: 0.12, blue: 0.12) : Theme.pieceInk)
+            .foregroundStyle(promoted ? palette.promotedInk : palette.pieceInk)
             .padding(.top, size * 0.12)
             .frame(width: size * 0.82, height: size * 0.92)
-            .background(KomaShape().fill(Theme.piece).shadow(color: .black.opacity(0.25), radius: 1, y: 1))
+            .background(KomaShape().fill(palette.pieceFill).shadow(color: .black.opacity(0.25), radius: 1, y: 1))
             .rotationEffect(.degrees(upsideDown ? 180 : 0))
     }
 
@@ -181,11 +181,11 @@ struct BoardView: View {
                         .shadow(color: palette.selection.opacity(palette.glow), radius: 5)
                 }
                 if isHintSource || isHintTarget {
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.hint, lineWidth: 3).padding(2)
                 }
                 if isRevealed {
-                    RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ok, lineWidth: 3).padding(2)
+                    RoundedRectangle(cornerRadius: 4).fill(palette.success.opacity(0.35)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(palette.success, lineWidth: 3).padding(2)
                 }
                 if let piece {
                     KomaView(label: Notation.label(piece), promoted: piece.promoted,

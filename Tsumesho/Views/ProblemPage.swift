@@ -3,16 +3,21 @@ import SwiftUI
 // 縦スワイプの 1 ページ。1 問ぶん。上のバー（モードとメニュー）は FeedView が画面の上に固定して出す
 struct ProblemPage: View {
     let problem: Problem
+    let mode: PlayMode
     let insets: EdgeInsets
+    let onNext: (() -> Void)?
     let onSolved: (_ seconds: Int, _ tesuji: String?) -> Void
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
     @Environment(\.palette) private var palette
     @State private var game: Game
 
-    init(problem: Problem, insets: EdgeInsets, onSolved: @escaping (_ seconds: Int, _ tesuji: String?) -> Void) {
+    init(problem: Problem, mode: PlayMode, insets: EdgeInsets, onNext: (() -> Void)? = nil,
+         onSolved: @escaping (_ seconds: Int, _ tesuji: String?) -> Void) {
         self.problem = problem
+        self.mode = mode
         self.insets = insets
+        self.onNext = onNext
         self.onSolved = onSolved
         _game = State(initialValue: Game(problem: problem))
     }
@@ -28,7 +33,11 @@ struct ProblemPage: View {
                 failCard(answer)
             }
             Spacer(minLength: 0)
-            RatingCard()
+            if mode.awardsScore {
+                RatingCard()
+            } else {
+                practiceFooter
+            }
             controls
         }
         .padding(.horizontal, 20)
@@ -40,7 +49,11 @@ struct ProblemPage: View {
             Button("成らない") { game.choosePromotion(false) }
         }
         .onAppear { game.start() }
+        .onChange(of: game.mistakeCount) { old, new in
+            if new > old { session.practice.recordMistake(problem, mode: mode) }
+        }
         .onChange(of: game.status) { _, status in
+            guard mode.awardsScore, session.mode == mode else { return }
             switch status {
             case .solved(let tesuji):
                 trial.recordSolve(plies: problem.plies, hintsUsed: game.hintsUsed)
@@ -56,12 +69,12 @@ struct ProblemPage: View {
                 break
             }
         }
-        .sensoryFeedback(trigger: game.lastMove) { _, _ in session.hapticsOn ? .selection : nil }
+        .sensoryFeedback(trigger: game.lastMove) { _, _ in session.hapticsOn && mode != .zen ? .selection : nil }
         .sensoryFeedback(trigger: game.status) { _, status in
-            guard session.hapticsOn, case .failed = status else { return nil }
+            guard session.hapticsOn, mode != .zen, case .failed = status else { return nil }
             return .error
         }
-        .animation(.spring(duration: 0.35), value: game.status)
+        .animation(mode == .zen ? nil : .spring(duration: 0.35), value: game.status)
     }
 
     private var promotionBinding: Binding<Bool> {
@@ -72,8 +85,8 @@ struct ProblemPage: View {
 
     private var modeRow: some View {
         HStack {
-            Text("[ \(session.mode.title) ]")
-                .font(Theme.display(14))
+            Text("[ \(mode.title) ]")
+                .font(mode == .zen ? .system(size: 14, weight: .medium, design: .serif) : Theme.display(14))
                 .tracking(2)
                 .foregroundStyle(palette.accent)
             Spacer()
@@ -95,7 +108,7 @@ struct ProblemPage: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                if trial.isRunning {
+                if mode == .timeTrial, trial.isRunning {
                     TimelineView(.periodic(from: .now, by: 0.5)) { context in
                         let left = trial.remaining(at: context.date)
                         // 残り 10 秒を切ったら赤く点滅させる
@@ -105,7 +118,7 @@ struct ProblemPage: View {
                             .font(Theme.number(30, weight: .black))
                             .monospacedDigit()
                             .foregroundStyle(urgent ? Color.red : palette.counter)
-                            .shadow(color: (urgent ? Color.red : Theme.neonPink).opacity(0.8 * palette.glow), radius: 8)
+                            .shadow(color: (urgent ? Color.red : palette.enemy).opacity(0.8 * palette.glow), radius: 8)
                             .opacity(blinkOff ? 0.35 : 1)
                     }
                     .overlay(alignment: .leading) {
@@ -130,7 +143,7 @@ struct ProblemPage: View {
                     Text("\(game.currentPly)/\(problem.plies)")
                         .font(Theme.number(30, weight: .black))
                         .foregroundStyle(palette.counter)
-                        .shadow(color: Theme.neonPink.opacity(0.8 * palette.glow), radius: 8)
+                        .shadow(color: palette.enemy.opacity(0.8 * palette.glow), radius: 8)
                     Text("手目")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(palette.subText)
@@ -144,8 +157,10 @@ struct ProblemPage: View {
     // 1 問目の案内か、遊んでいる途中の知らせ（王手になっていない、玉方の応手など）
     private var statusLine: some View {
         Group {
-            if let guide = game.guide {
-                Label(guide, systemImage: "hand.point.up.left.fill").foregroundStyle(palette.plain ? Theme.hint : Theme.goldGlow)
+            if mode == .zen, case .solved = game.status {
+                PracticeMateMessage()
+            } else if let guide = game.guide, mode != .zen {
+                Label(guide, systemImage: "hand.point.up.left.fill").foregroundStyle(palette.plain ? palette.hint : Theme.goldGlow)
             } else {
                 Text(game.message).foregroundStyle(messageColor)
             }
@@ -153,14 +168,14 @@ struct ProblemPage: View {
         .font(.system(size: 14, weight: .semibold))
         .lineLimit(2)
         .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
-        .animation(.default, value: game.message)
+        .animation(mode == .zen ? nil : .default, value: game.message)
     }
 
     private var messageColor: Color {
         switch game.status {
-        case .failed: Theme.neonPink
+        case .failed: palette.enemy
         case .thinking: palette.subText
-        default: game.message.hasPrefix("王手になって") ? Theme.hint : palette.text
+        default: game.message.hasPrefix("王手になって") ? palette.hint : palette.text
         }
     }
 
@@ -211,13 +226,13 @@ struct ProblemPage: View {
                     }
                 }
                 // ヒントで光らせるとき
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.hint, lineWidth: game.hintHandKinds.contains(item.kind) ? 3 : 0))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(palette.hint, lineWidth: game.hintHandKinds.contains(item.kind) ? 3 : 0))
                 // 間違えたときに見せる正解が、この持ち駒を打つ手のとき
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.ok, lineWidth: isRevealedDrop(item.kind) ? 3 : 0))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(palette.success, lineWidth: isRevealedDrop(item.kind) ? 3 : 0))
                 .overlay {
                     // 1 問目の案内：タップしてほしい持ち駒を点滅させる
-                    if game.guideHandKind == item.kind {
-                        RoundedRectangle(cornerRadius: 12).strokeBorder(palette.plain ? Theme.hint : Theme.goldGlow, lineWidth: 3)
+                    if mode != .zen, game.guideHandKind == item.kind {
+                        RoundedRectangle(cornerRadius: 12).strokeBorder(palette.plain ? palette.hint : Theme.goldGlow, lineWidth: 3)
                             .phaseAnimator([0.2, 1.0]) { ring, phase in
                                 ring.opacity(phase)
                             } animation: { _ in .easeInOut(duration: 0.7) }
@@ -242,17 +257,32 @@ struct ProblemPage: View {
             Spacer()
             Button("もう一度") { game.reset() }
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Theme.neonPink)
+                .foregroundStyle(palette.enemy)
                 .padding(.horizontal, 14).padding(.vertical, 8)
-                .overlay(Capsule().stroke(Theme.neonPink, lineWidth: 1.5))
+                .overlay(Capsule().stroke(palette.enemy, lineWidth: 1.5))
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 16).fill(palette.panel.opacity(0.85)))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.neonPink.opacity(0.6), lineWidth: 1))
-        .shadow(color: Theme.neonPink.opacity(0.3 * palette.glow), radius: 10)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(palette.enemy.opacity(0.6), lineWidth: 1))
+        .shadow(color: palette.enemy.opacity(0.3 * palette.glow), radius: 10)
     }
 
     // MARK: 下のボタン
+
+    private var practiceFooter: some View {
+        HStack(spacing: 12) {
+            Text("ノーマルでミスした問題を練習中")
+                .font(.system(size: 12))
+                .foregroundStyle(palette.subText)
+            Spacer(minLength: 0)
+            if case .solved = game.status, let onNext {
+                Button("次の一問", action: onNext)
+                    .font(.system(size: 14, weight: .semibold))
+                    .tint(palette.accent)
+            }
+        }
+        .frame(minHeight: 44)
+    }
 
     private var controls: some View {
         HStack(spacing: 56) {
@@ -265,7 +295,7 @@ struct ProblemPage: View {
                         .font(Theme.number(10))
                         .foregroundStyle(Theme.background)
                         .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Capsule().fill(Theme.hint))
+                        .background(Capsule().fill(palette.hint))
                 }
             }
             .disabled(game.status != .playing || game.hintLevel >= 2)
@@ -387,7 +417,7 @@ struct NeonBackdrop: View {
         ZStack {
             palette.background
             if !palette.plain {
-                RadialGradient(colors: [Theme.neonPink.opacity(0.22), .clear], center: .topTrailing, startRadius: 0, endRadius: 460)
+                RadialGradient(colors: [palette.enemy.opacity(0.22), .clear], center: .topTrailing, startRadius: 0, endRadius: 460)
                 RadialGradient(colors: [Theme.neonCyan.opacity(0.2), .clear], center: .bottomLeading, startRadius: 0, endRadius: 460)
             }
         }
