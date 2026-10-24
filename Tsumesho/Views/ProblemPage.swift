@@ -198,7 +198,7 @@ struct ProblemPage: View {
             Button {
                 game.reset()
             } label: {
-                Label("最初から", systemImage: "arrow.counterclockwise")
+                Label("盤面をリセット", systemImage: "arrow.counterclockwise")
             }
 
             Spacer()
