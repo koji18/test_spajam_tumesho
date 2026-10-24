@@ -1,7 +1,8 @@
 import SwiftUI
 
-// 将棋の駒の五角形
+/// 将棋の駒の五角形
 struct KomaShape: Shape {
+    /// r に収まる駒の五角形
     func path(in r: CGRect) -> Path {
         var p = Path()
         p.move(to: CGPoint(x: r.midX, y: r.minY))
@@ -14,7 +15,7 @@ struct KomaShape: Shape {
     }
 }
 
-// 駒の光らせ方。攻め方はシアン、玉方はピンク、持ち駒は金色で光らせる
+/// 駒の光らせ方。攻め方はシアン、玉方はピンク、持ち駒は金色で光らせる
 enum KomaTone {
     case attacker, defender, hand
 }
@@ -31,7 +32,7 @@ struct KomaView: View {
         if palette.plain { classic } else { neon }
     }
 
-    // 普通の見た目：クリーム色の駒に黒い文字
+    /// 普通の見た目：クリーム色の駒に黒い文字
     private var classic: some View {
         Text(label)
             .font(Theme.koma(size * 0.5))
@@ -66,6 +67,7 @@ struct KomaView: View {
             .rotationEffect(.degrees(upsideDown ? 180 : 0))
     }
 
+    /// ネオンの見た目での駒の文字の色
     private func textColor(_ glow: Color) -> Color {
         if tone == .hand { return Theme.cream }
         if promoted { return Theme.goldGlow }
@@ -73,8 +75,8 @@ struct KomaView: View {
     }
 }
 
-// 将棋盤。9×9 の普通の盤か、玉のまわりの 5×5 を切り出した盤を表示する。
-// 外枠は、切り出した辺も含めて 4 辺とも白く光らせる
+/// 将棋盤。9×9 の普通の盤か、玉のまわりの 5×5 を切り出した盤を表示する。
+/// 外枠は、切り出した辺も含めて 4 辺とも白く光らせる
 struct BoardView: View {
     let game: Game
     @Environment(\.palette) private var palette
@@ -131,7 +133,7 @@ struct BoardView: View {
         .aspectRatio(1, contentMode: .fit)
     }
 
-    // 盤の外枠の光る線
+    /// 盤の外枠の光る線
     private func edge(horizontal: Bool) -> some View {
         Rectangle()
             .fill(palette.boardEdge)
@@ -140,7 +142,7 @@ struct BoardView: View {
             .allowsHitTesting(false)
     }
 
-    // 星（盤の目印の点）。三段と四段、六段と七段の間、３筋と４筋、６筋と７筋の間の交点に打つ
+    /// 星（盤の目印の点）。三段と四段、六段と七段の間、３筋と４筋、６筋と７筋の間の交点に打つ
     private func stars(files: [Int], ranks: [Int], cell: CGFloat) -> some View {
         let xs = [7, 4].compactMap { f in files.firstIndex(of: f).flatMap { i in i + 1 < files.count ? CGFloat(i + 1) * cell : nil } }
         let ys = [3, 6].compactMap { r in ranks.firstIndex(of: r).flatMap { i in i + 1 < ranks.count ? CGFloat(i + 1) * cell : nil } }
@@ -155,6 +157,7 @@ struct BoardView: View {
         .allowsHitTesting(false)
     }
 
+    /// 盤の 1 マス。駒と、動けるマス・選択・ヒント・正解の光を重ねる
     @ViewBuilder
     private func cellView(_ i: Int, size: CGFloat) -> some View {
         let piece = game.position.board[i]
@@ -200,6 +203,7 @@ struct BoardView: View {
         .accessibilityLabel(accessibilityText(i, piece))
     }
 
+    /// マスの読み上げ。例「５一　玉方の玉」
     private func accessibilityText(_ i: Int, _ piece: Piece?) -> String {
         let at = Notation.fileLabel(Square.file(i)) + Notation.rankLabel(Square.rank(i))
         guard let piece else { return at }

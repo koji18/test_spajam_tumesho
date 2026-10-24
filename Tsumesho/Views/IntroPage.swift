@@ -1,7 +1,7 @@
 import SwiftUI
 
-// 最初の画面。遊び方を 3 点だけ伝え、盤の大きさを選んで始める。駒の動き方は教えない。
-// 盤の大きさは遊んでいる間は変えられない。変えたいときは問題画面の「トップ」からここに戻る
+/// 最初の画面。遊び方を 3 点だけ伝え、盤の大きさを選んで始める。駒の動き方は教えない。
+/// 盤の大きさは遊んでいる間は変えられない。変えたいときは問題画面の「トップ」からここに戻る
 struct IntroPage: View {
     let onStart: () -> Void
     @Environment(Session.self) private var session
@@ -70,6 +70,7 @@ struct IntroPage: View {
         }
     }
 
+    /// 遊び方の 1 項目
     private func rule<Icon: View>(no: String, title: String, text: String, @ViewBuilder icon: () -> Icon) -> some View {
         HStack(alignment: .top, spacing: 14) {
             icon().frame(width: 44, height: 44)

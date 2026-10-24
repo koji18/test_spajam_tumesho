@@ -16,7 +16,7 @@ final class Session {
     var mode: PlayMode { didSet { store.set(mode.rawValue, forKey: "mode") } }
     var boardSize: BoardSize { didSet { store.set(boardSize.rawValue, forKey: "boardSize") } }
     var hapticsOn: Bool { didSet { store.set(hapticsOn, forKey: "hapticsOn") } }
-    // 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
+    /// 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
     var palette: Palette { tutorialCleared ? .neon : .classic }
@@ -27,11 +27,12 @@ final class Session {
     private(set) var solvedTotal: Int { didSet { store.set(solvedTotal, forKey: "solvedTotal") } }
     private(set) var timeTrialBest: Int { didSet { store.set(timeTrialBest, forKey: "timeTrialBest") } }
     private(set) var totalScore: Int { didSet { store.set(totalScore, forKey: "totalScore") } }
-    // カードに出しているスコア。解いた直後は前の値のままにしておき、演出が消えてから数え上げる
+    /// カードに出しているスコア。解いた直後は前の値のままにしておき、演出が消えてから数え上げる
     private(set) var displayedScore: Int
-    // 数え上げている間だけ、カードの横に「+735」と出す
+    /// 数え上げている間だけ、カードの横に「+735」と出す
     private(set) var scorePopup: Int?
 
+    /// 保存してある設定と成績を読み込む
     init() {
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
@@ -47,9 +48,9 @@ final class Session {
         displayedScore = score
     }
 
-    // 正解：レーティングは 1 手詰めで +12、3 手詰めで +20。ヒントを 1 段使うごとに 5 減らす（最低 +2）。
-    //       スコアは ScoreGain の計算で累計に足し、得た点を返す。
-    // 間違い：レーティングは -10（0 より下にはしない）。連勝は 0 に戻る
+    /// 正解したとき。連勝と正解数を増やし、レーティングを上げ、スコアを累計に足して、得た点を返す。
+    /// レーティングは 1 手詰めで +12、3 手詰めで +20。ヒントを 1 段使うごとに 5 減らす（最低 +2）。
+    /// 間違えたときは recordMiss（レーティング -10、連勝を 0 に戻す）
     @discardableResult
     func recordSolve(plies: Int, size: BoardSize, seconds: Int, hintsUsed: Int) -> ScoreGain {
         streak += 1
@@ -61,7 +62,7 @@ final class Session {
         return gain
     }
 
-    // カードのスコアを、今の表示から累計まで約 0.8 秒で数え上げる
+    /// カードのスコアを、今の表示から累計まで約 0.8 秒で数え上げる
     func revealScore() async {
         let from = displayedScore
         let to = totalScore
@@ -77,19 +78,21 @@ final class Session {
         scorePopup = nil
     }
 
+    /// 間違えたとき。レーティングを下げ、連勝を 0 に戻す
     func recordMiss() {
         streak = 0
         rating = max(0, rating - 10)
     }
 
-    // 次に解いたときにかかる連勝の倍率
+    /// 次に解いたときにかかる連勝の倍率
     var nextStreakMultiplier: Double { ScoreGain.streakMultiplier(for: streak + 1) }
 
+    /// タイムトライアルが終わったとき。最高記録を更新する
     func recordTimeTrial(solved: Int) {
         timeTrialBest = max(timeTrialBest, solved)
     }
 
-    // レーティングに応じた段位のバッジ
+    /// レーティングに応じた段位のバッジ
     var rankBadge: String {
         switch rating {
         case ..<1400: "級"

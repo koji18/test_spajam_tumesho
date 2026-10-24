@@ -5,6 +5,7 @@ struct TsumeshoApp: App {
     @State private var session = Session()
     @State private var trial = TimeTrial()
 
+    /// 起動時に、同梱したフォントを登録する
     init() {
         Theme.registerFonts()
     }
@@ -20,8 +21,8 @@ struct TsumeshoApp: App {
     }
 }
 
-// 最初の画面で盤の大きさを選んで始め、メニューの「ホーム」で最初の画面に戻る。
-// 作った問題は戻っても残しておく
+/// 最初の画面で盤の大きさを選んで始め、メニューの「ホーム」で最初の画面に戻る。
+/// 作った問題は戻っても残しておく
 struct RootView: View {
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial

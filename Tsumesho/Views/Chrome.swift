@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 画面の上に固定するバー。左に今のモード、右にメニューを開く歯車
+/// 画面の上に固定するバー。左に今のモード、右にメニューを開く歯車
 struct TopBar: View {
     static let height: CGFloat = 72
 
@@ -48,7 +48,7 @@ struct TopBar: View {
     }
 }
 
-// モードのアイコン。ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
+/// モードのアイコン。ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
 struct ModeIcon: View {
     let mode: PlayMode
     var size: CGFloat = 22
@@ -66,7 +66,7 @@ struct ModeIcon: View {
     }
 }
 
-// 歯車から開くメニュー
+/// 歯車から開くメニュー
 struct MenuPanel: View {
     let onHome: () -> Void
     let onMode: (PlayMode) -> Void
@@ -115,6 +115,7 @@ struct MenuPanel: View {
         .shadow(color: Theme.neonCyan.opacity(0.45), radius: 18)
     }
 
+    /// メニューの 1 行。選ばれている行は金色で光らせる
     private func row<Icon: View>(title: String, selected: Bool, action: @escaping () -> Void, @ViewBuilder icon: () -> Icon) -> some View {
         Button(action: action) {
             HStack(spacing: 18) {
@@ -135,7 +136,7 @@ struct MenuPanel: View {
     }
 }
 
-// タイムトライアルの時間切れ
+/// タイムトライアルの時間切れ
 struct TimeUpView: View {
     let solved: Int
     let best: Int
@@ -179,7 +180,7 @@ struct TimeUpView: View {
     }
 }
 
-// 記録
+/// 記録
 struct RecordsView: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -210,6 +211,7 @@ struct RecordsView: View {
         }
     }
 
+    /// 記録の 1 行
     private func stat(_ name: String, _ value: String) -> some View {
         LabeledContent(name) {
             Text(value).font(Theme.number(16)).foregroundStyle(Theme.neonCyan)
@@ -217,7 +219,7 @@ struct RecordsView: View {
     }
 }
 
-// 設定
+/// 設定
 struct SettingsView: View {
     let onShowTutorial: () -> Void
     @Environment(Session.self) private var session

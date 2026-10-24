@@ -6,8 +6,8 @@ import UIKit
 enum Haptics {
     private static var engine: CHHapticEngine?
 
-    // 詰んだ瞬間：いちばん強い振動を約 0.6 秒続け、その上に強い「ドン」を 4 回重ねる。
-    // Core Haptics が使えない機種では、標準の振動を続けて鳴らす
+    /// 詰んだ瞬間：いちばん強い振動を約 0.6 秒続け、その上に強い「ドン」を 4 回重ねる。
+    /// Core Haptics が使えない機種では、標準の振動を続けて鳴らす
     static func mate(enabled: Bool) {
         guard enabled else { return }
         if playMatePattern() { return }
@@ -20,6 +20,7 @@ enum Haptics {
         }
     }
 
+    /// Core Haptics で詰みの振動を鳴らす。鳴らせなければ false
     private static func playMatePattern() -> Bool {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return false }
         do {

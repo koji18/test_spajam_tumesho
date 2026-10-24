@@ -1,7 +1,7 @@
 import SwiftUI
 
-// 問題を縦に並べ、ショート動画のように 1 問ずつスワイプで送る。
-// 1 問目の例題のあとは、裏で作った問題が続く。上のバーとメニュー、詰み演出は列の上のレイヤーに出す
+/// 問題を縦に並べ、ショート動画のように 1 問ずつスワイプで送る。
+/// 1 問目の例題のあとは、裏で作った問題が続く。上のバーとメニュー、詰み演出は列の上のレイヤーに出す
 struct FeedView: View {
     let feed: ProblemFeed
     let onHome: () -> Void
@@ -9,9 +9,9 @@ struct FeedView: View {
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
 
-    // 今見ているページ。問題は problem.key、作り置きを待つページは "generating"
+    /// 今見ているページ。問題は problem.key、作り置きを待つページは "generating"
     @State private var currentPage: String?
-    // 盤のサイズを切り替えたとき、前に見ていたページに戻るために覚えておく
+    /// 盤のサイズを切り替えたとき、前に見ていたページに戻るために覚えておく
     @State private var lastPage: [BoardSize: String] = [:]
     @State private var celebration: Celebration?
     @State private var menuOpen = false
@@ -124,16 +124,18 @@ struct FeedView: View {
         }
     }
 
+    /// メニューを閉じる
     private func closeMenu() {
         withAnimation(.spring(duration: 0.3)) { menuOpen = false }
     }
 
+    /// モードを切り替える。タイムトライアルなら時計を始め、ノーマルなら止める
     private func select(_ mode: PlayMode) {
         session.mode = mode
         if mode == .timeTrial { trial.begin() } else { trial.stop() }
     }
 
-    // 盤のサイズを変えたら、その大きさの問題の列に移る。前に見ていたページがあればそこへ
+    /// 盤のサイズを変えたら、その大きさの問題の列に移る。前に見ていたページがあればそこへ
     private func switchSize(to newSize: BoardSize) {
         guard newSize != size else { return }
         lastPage[size] = currentPage
@@ -142,7 +144,7 @@ struct FeedView: View {
         currentPage = lastPage[newSize] ?? feed.problems(newSize).first?.key
     }
 
-    // 演出を出し、少し見せてから下の列だけを次の問題へスライドさせ、最後に演出を消す
+    /// 演出を出し、少し見せてから下の列だけを次の問題へスライドさせ、最後に演出を消す
     private func celebrate(_ problem: Problem, seconds: Int, tesuji: String?) {
         Haptics.mate(enabled: session.hapticsOn)
         let c = Celebration(problem: problem, seconds: seconds, tesuji: tesuji)
@@ -164,7 +166,7 @@ struct FeedView: View {
         }
     }
 
-    // 演出をタップしたとき。まだスライドしていなければスライドさせて、すぐ演出を消す
+    /// 演出をタップしたとき。まだスライドしていなければスライドさせて、すぐ演出を消す
     private func finishCelebration() {
         guard celebration != nil else { return }
         if !session.tutorialCleared { session.tutorialCleared = true }
@@ -174,7 +176,7 @@ struct FeedView: View {
         Task { await session.revealScore() }
     }
 
-    // 詰んだ問題の次へ。まだできていなければ作り置きを待つページへ。一度の演出で一度だけ進める
+    /// 詰んだ問題の次へ。まだできていなければ作り置きを待つページへ。一度の演出で一度だけ進める
     private func slideToNext() {
         guard let c = celebration, !c.slid,
               let index = problems.firstIndex(where: { $0.key == c.problem.key }) else { return }

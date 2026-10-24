@@ -13,14 +13,14 @@ enum Theme {
     static let piece = Color(red: 0.965, green: 0.906, blue: 0.769)
     static let pieceInk = Color(red: 0.114, green: 0.102, blue: 0.078)
 
-    // ネオン風の盤と駒
+    /// ネオン風の盤と駒
     static let neonCyan = Color(red: 0.25, green: 0.88, blue: 1.0)   // 攻め方の駒と盤の枠
     static let neonPink = Color(red: 1.0, green: 0.24, blue: 0.6)    // 玉方の駒
     static let pieceFill = Color(red: 0.07, green: 0.08, blue: 0.14)
     static let gridLine = Color.white.opacity(0.32)
     static let panel = Color(red: 0.05, green: 0.06, blue: 0.09)
 
-    // 詰み演出の色
+    /// 詰み演出の色
     static let neonGreen = Color(red: 0.78, green: 1.0, blue: 0.18)
     static let neonMagenta = Color(red: 1.0, green: 0.24, blue: 0.81)
     static let cream = Color(red: 1.0, green: 0.96, blue: 0.86)
@@ -29,21 +29,23 @@ enum Theme {
         colors: [Color(red: 1.0, green: 0.97, blue: 0.86), Color(red: 0.96, green: 0.81, blue: 0.48), Color(red: 0.75, green: 0.54, blue: 0.17)],
         startPoint: .top, endPoint: .bottom)
 
+    /// 駒の文字のフォント（ヒラギノ明朝）
     static func koma(_ size: CGFloat) -> Font { .custom("HiraMinProN-W6", size: size) }
 
-    // 毛筆体（Yuji Boku）。演出に使う「詰」「正」「解」の 3 文字だけに絞って同梱している（Fonts/YujiBoku-OFL.txt）
+    /// 毛筆体（Yuji Boku）。演出に使う「詰」「正」「解」の 3 文字だけに絞って同梱している（Fonts/YujiBoku-OFL.txt）
     static func brush(_ size: CGFloat) -> Font { .custom("YujiBoku-Regular", size: size) }
 
-    // 英数字の飾り文字（NORMAL・1540・01:24 など）。Orbitron は予約フォント名があるので、改変せずに同梱している
+    /// 英数字の飾り文字（NORMAL・1540・01:24 など）。Orbitron は予約フォント名があるので、改変せずに同梱している
     static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
         .custom("Orbitron", size: size).weight(weight)
     }
 
-    // 数字。Orbitron の数字は「7」が独特の形で読みにくいので、数字は丸ゴシックの太字で出し、桁の幅をそろえる
+    /// 数字。Orbitron の数字は「7」が独特の形で読みにくいので、数字は丸ゴシックの太字で出し、桁の幅をそろえる
     static func number(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
         .system(size: size, weight: weight, design: .rounded).monospacedDigit()
     }
 
+    /// 同梱したフォントをアプリで使えるように登録する。起動時に一度呼ぶ
     static func registerFonts() {
         for name in ["YujiBoku-Subset", "Orbitron"] {
             guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { continue }
@@ -51,15 +53,15 @@ enum Theme {
         }
     }
 
-    // 「三手詰」のように手数を漢数字にする
+    /// 「三手詰」のように手数を漢数字にする
     static func kanjiNumber(_ n: Int) -> String {
         let digits = Array("〇一二三四五六七八九")
         return n < 10 ? String(digits[n]) : String(n)
     }
 }
 
-// 見た目の組み合わせ。初回のチュートリアルを詰ませるまでは落ち着いた「普通」の見た目で出し、
-// 詰ませた瞬間に派手な「ネオン」の見た目に切り替える
+/// 見た目の組み合わせ。初回のチュートリアルを詰ませるまでは落ち着いた「普通」の見た目で出し、
+/// 詰ませた瞬間に派手な「ネオン」の見た目に切り替える
 struct Palette {
     let plain: Bool
 
@@ -77,18 +79,18 @@ struct Palette {
     var badgeStroke: Color { plain ? Theme.woodLine : Theme.neonCyan }
     var resetButton: Color { plain ? Theme.pieceInk : Theme.neonCyan }
     var hintButton: Color { plain ? Theme.pieceInk : .white }
-    // 光らせる強さ。普通の見た目では光らせない
+    /// 光らせる強さ。普通の見た目では光らせない
     var glow: Double { plain ? 0 : 1 }
 
-    // 盤
+    /// 盤
     var boardFill: Color { plain ? Theme.wood : .black }
     var gridLine: Color { plain ? Theme.woodLine.opacity(0.7) : Theme.gridLine }
     var boardEdge: Color { plain ? Theme.woodLine : .white.opacity(0.9) }
     var coordinate: Color { plain ? Color(red: 0.42, green: 0.39, blue: 0.33) : Theme.ink.opacity(0.75) }
-    // 動けるマス。普通の見た目では、木目の盤の上で見えるように青でしっかり塗る
+    /// 動けるマス。普通の見た目では、木目の盤の上で見えるように青でしっかり塗る
     var target: Color { plain ? Color(red: 0.16, green: 0.45, blue: 0.85) : Theme.neonCyan }
     var targetFill: Double { plain ? 0.38 : 0.22 }
-    // 選んだ駒
+    /// 選んだ駒
     var selection: Color { plain ? Color(red: 0.36, green: 0.22, blue: 0.08) : Theme.goldGlow }
     var selectionFill: Double { plain ? 0.3 : 0.28 }
     var lastMove: Color { plain ? Theme.hint : Theme.neonPink }

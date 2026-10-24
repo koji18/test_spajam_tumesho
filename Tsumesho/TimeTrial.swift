@@ -7,7 +7,7 @@ final class TimeTrial {
     static let startTime: TimeInterval = 60
     static let missPenalty = 5
 
-    // タイマーの横に浮かべる「+12s」「-5s」
+    /// タイマーの横に浮かべる「+12s」「-5s」
     struct Popup: Equatable {
         let id = UUID()
         let seconds: Int
@@ -18,9 +18,10 @@ final class TimeTrial {
     private(set) var solved = 0
     private(set) var finished = false
     private(set) var popup: Popup?
-    // 正解で増えた秒数。詰み演出が消えてからタイマーの横に出す
+    /// 正解で増えた秒数。詰み演出が消えてからタイマーの横に出す
     private var pendingBonus: Int?
 
+    /// タイムトライアルを始める（やり直すときも呼ぶ）
     func begin() {
         let now = Date()
         startedAt = now
@@ -31,6 +32,7 @@ final class TimeTrial {
         pendingBonus = nil
     }
 
+    /// タイムトライアルをやめる
     func stop() {
         startedAt = nil
         deadline = nil
@@ -41,12 +43,13 @@ final class TimeTrial {
 
     var isRunning: Bool { deadline != nil && !finished }
 
+    /// now の時点での残り時間
     func remaining(at now: Date = Date()) -> TimeInterval {
         guard let deadline else { return Self.startTime }
         return max(0, deadline.timeIntervalSince(now))
     }
 
-    // 正解：1 手詰めは +5 秒、3 手詰めは +12 秒。ヒントを使った問題は半分
+    /// 正解：1 手詰めは +5 秒、3 手詰めは +12 秒。ヒントを使った問題は半分
     func recordSolve(plies: Int, hintsUsed: Int) {
         guard isRunning, let deadline else { return }
         solved += 1
@@ -56,20 +59,21 @@ final class TimeTrial {
         pendingBonus = bonus
     }
 
-    // 間違い：-5 秒。すぐタイマーの横に出す
+    /// 間違い：-5 秒。すぐタイマーの横に出す
     func recordMiss() {
         guard isRunning, let deadline else { return }
         self.deadline = deadline.addingTimeInterval(-TimeInterval(Self.missPenalty))
         Task { await show(-Self.missPenalty) }
     }
 
-    // 詰み演出が消えたら、正解で増えた秒数を出す
+    /// 詰み演出が消えたら、正解で増えた秒数を出す
     func revealBonus() async {
         guard let bonus = pendingBonus else { return }
         pendingBonus = nil
         await show(bonus)
     }
 
+    /// 増減した秒数をタイマーの横に 1.4 秒だけ出す
     private func show(_ seconds: Int) async {
         let p = Popup(seconds: seconds)
         popup = p
@@ -77,10 +81,12 @@ final class TimeTrial {
         if popup == p { popup = nil }
     }
 
+    /// 時間切れにする
     func finish() {
         finished = true
     }
 
+    /// 秒数を「01:24」の形にする
     static func format(_ seconds: TimeInterval) -> String {
         let s = Int(seconds.rounded(.up))
         return String(format: "%02d:%02d", s / 60, s % 60)

@@ -17,7 +17,7 @@ final class Game {
     }
 
     let problem: Problem
-    // 表示範囲。3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
+    /// 表示範囲。3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
     let windowFiles: ClosedRange<Int>
     private(set) var position: Position
     private(set) var pliesLeft: Int
@@ -27,21 +27,22 @@ final class Game {
     private(set) var targets: Set<Int> = []
     private(set) var lastMove: Move?
     private(set) var hintLevel = 0
-    // この問題で使ったヒントの段階の最大。レーティングの上がり幅を減らすのに使う
+    /// この問題で使ったヒントの段階の最大。レーティングの上がり幅を減らすのに使う
     private(set) var hintsUsed = 0
-    // ヒントで光らせるマスと持ち駒。盤のマスごとに計算し直すと重いので、ヒントを押したときに一度だけ計算する
+    /// ヒントで光らせるマスと持ち駒。盤のマスごとに計算し直すと重いので、ヒントを押したときに一度だけ計算する
     private(set) var hintSources: Set<Int> = []
     private(set) var hintHandKinds: Set<Kind> = []
     private(set) var hintTargets: Set<Int> = []
-    // 間違えたときに盤で見せる正解の手
+    /// 間違えたときに盤で見せる正解の手
     private(set) var revealedAnswer: Move?
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
-    // 解くのにかかった時間。ページが表示されたときから数える
+    /// 解くのにかかった時間。ページが表示されたときから数える
     private var startedAt: Date?
     private(set) var solvedSeconds = 0
 
+    /// 問題の最初の局面から遊び始める
     init(problem: Problem) {
         let start = problem.position
         self.problem = problem
@@ -51,7 +52,7 @@ final class Game {
         message = Self.prompt(for: problem)
     }
 
-    // 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる
+    /// 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる
     private static func prompt(for problem: Problem) -> String {
         problem.id == 1 ? "王手をかけて、玉を詰ませよう" : ""
     }
@@ -74,10 +75,10 @@ final class Game {
     var visibleFiles: ClosedRange<Int> { windowFiles }
     var visibleRanks: ClosedRange<Int> { Position.windowRanks(span: problem.size.span) }
 
-    // 今が何手目か（1 手詰めは 1/1、3 手詰めは 1/3 から 3/3）
+    /// 今が何手目か（1 手詰めは 1/1、3 手詰めは 1/3 から 3/3）
     var currentPly: Int { problem.plies - pliesLeft + 1 }
 
-    // 攻め方が指せる手を、見えているマスへの手に限る
+    /// 攻め方が指せる手を、見えているマスへの手に限る
     private var filter: ((Move) -> Bool)? {
         guard problem.size.span < 9 else { return nil }
         let files = windowFiles
@@ -87,7 +88,7 @@ final class Game {
 
     // MARK: 1 問目の案内
 
-    // 1 問目だけ、操作に合わせて次にやることを案内する
+    /// 1 問目だけ、操作に合わせて次にやることを案内する
     var guide: String? {
         guard isGuiding else { return nil }
         switch selection {
@@ -103,12 +104,13 @@ final class Game {
 
     // MARK: ヒント
 
-    // 1 回目：王手をかけられる駒を光らせる。2 回目：正解の駒と行き先だけを光らせる
-    // ページが表示されたら呼ぶ。2 回目以降は何もしない
+    /// 1 回目：王手をかけられる駒を光らせる。2 回目：正解の駒と行き先だけを光らせる
+    /// ページが表示されたら呼ぶ。2 回目以降は何もしない
     func start() {
         if startedAt == nil { startedAt = Date() }
     }
 
+    /// ヒントを 1 段進める。2 段まで
     func showHint() {
         guard status == .playing, hintLevel < 2 else { return }
         hintLevel += 1
@@ -116,6 +118,7 @@ final class Game {
         refreshHints()
     }
 
+    /// ヒントの段階に合わせて、光らせるマスと持ち駒を計算し直す
     private func refreshHints() {
         switch hintLevel {
         case 1:
@@ -137,6 +140,7 @@ final class Game {
 
     // MARK: 操作
 
+    /// 盤のマスをタップしたとき。光っているマスなら指し、自分の駒なら選び、それ以外なら選択を外す
     func tap(square: Int) {
         guard status == .playing else { return }
         if selection != nil, targets.contains(square) {
@@ -155,17 +159,20 @@ final class Game {
         }
     }
 
+    /// 持ち駒をタップしたとき。選ぶか、選んでいたら外す
     func tap(hand kind: Kind) {
         guard status == .playing else { return }
         select(selection == .hand(kind) ? nil : .hand(kind))
     }
 
+    /// 成るか成らないかを選んだとき
     func choosePromotion(_ promote: Bool) {
         guard let pending = pendingPromotion else { return }
         pendingPromotion = nil
         attempt(promote ? pending.promote : pending.stay)
     }
 
+    /// 盤面を問題の最初に戻す
     func reset() {
         position = problem.position
         pliesLeft = problem.plies
@@ -181,11 +188,13 @@ final class Game {
         startedAt = Date()
     }
 
+    /// 駒か持ち駒を選び、動けるマスを計算し直す
     private func select(_ s: Selection?) {
         selection = s
         targets = Set(candidateMoves().map(\.to))
     }
 
+    /// 選んでいる駒か持ち駒で指せる、表示範囲の中の合法手
     private func candidateMoves() -> [Move] {
         guard let selection else { return [] }
         return position.legalMoves().filter { m in
@@ -197,7 +206,7 @@ final class Game {
         }
     }
 
-    // 指した手を判定する。王手でない手は詰将棋では指せないので、盤を戻して知らせる
+    /// 指した手を判定する。王手でない手は詰将棋では指せないので、盤を戻して知らせる
     private func attempt(_ m: Move) {
         select(nil)
         guard position.givesCheck(m) else {

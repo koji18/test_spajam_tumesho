@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 縦スワイプの 1 ページ。1 問ぶん。上のバー（モードとメニュー）は FeedView が画面の上に固定して出す
+/// 縦スワイプの 1 ページ。1 問ぶん。上のバー（モードとメニュー）は FeedView が画面の上に固定して出す
 struct ProblemPage: View {
     let problem: Problem
     let insets: EdgeInsets
@@ -10,6 +10,7 @@ struct ProblemPage: View {
     @Environment(\.palette) private var palette
     @State private var game: Game
 
+    /// 1 問ぶんのページを作る。詰んだら onSolved に解いた秒数と手筋の名前を渡す
     init(problem: Problem, insets: EdgeInsets, onSolved: @escaping (_ seconds: Int, _ tesuji: String?) -> Void) {
         self.problem = problem
         self.insets = insets
@@ -98,7 +99,7 @@ struct ProblemPage: View {
                 if trial.isRunning {
                     TimelineView(.periodic(from: .now, by: 0.5)) { context in
                         let left = trial.remaining(at: context.date)
-                        // 残り 10 秒を切ったら赤く点滅させる
+                        /// 残り 10 秒を切ったら赤く点滅させる
                         let urgent = left < 10
                         let blinkOff = urgent && Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
                         Text(TimeTrial.format(left))
@@ -141,7 +142,7 @@ struct ProblemPage: View {
 
     // MARK: 盤の下
 
-    // 1 問目の案内か、遊んでいる途中の知らせ（王手になっていない、玉方の応手など）
+    /// 1 問目の案内か、遊んでいる途中の知らせ（王手になっていない、玉方の応手など）
     private var statusLine: some View {
         Group {
             if let guide = game.guide {
@@ -187,6 +188,7 @@ struct ProblemPage: View {
         .frame(minHeight: 64)
     }
 
+    /// 持ち駒の 1 枚ぶんのタイル
     private func handTile(_ item: Game.HandItem) -> some View {
         let selected = game.selection == .hand(item.kind)
         return Button {
@@ -228,11 +230,13 @@ struct ProblemPage: View {
         .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : ""))
     }
 
+    /// 間違えたときに見せる正解が、kind の持ち駒を打つ手か
     private func isRevealedDrop(_ kind: Kind) -> Bool {
         guard let m = game.revealedAnswer else { return false }
         return m.from == nil && m.kind == kind
     }
 
+    /// 間違えたときに出す、正解とやり直しのカード
     private func failCard(_ answer: String) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -280,13 +284,13 @@ struct ProblemPage: View {
     }
 }
 
-// レーティングと連勝数のカード
+/// レーティングと連勝数のカード
 struct RatingCard: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
     var body: some View {
-        // 連勝の目盛りは 5 つ。5 連勝ごとに一周する
+        /// 連勝の目盛りは 5 つ。5 連勝ごとに一周する
         let filled = session.streak == 0 ? 0 : (session.streak - 1) % 5 + 1
         HStack(spacing: 14) {
             Text(session.rankBadge)
@@ -356,7 +360,7 @@ struct RatingCard: View {
     }
 }
 
-// 丸い枠のボタン
+/// 丸い枠のボタン
 struct CircleButton: View {
     let systemImage: String
     let color: Color
@@ -379,7 +383,7 @@ struct CircleButton: View {
     }
 }
 
-// 画面の背景。ネオンの見た目では、上にピンク、下にシアンのぼんやりした光を置く
+/// 画面の背景。ネオンの見た目では、上にピンク、下にシアンのぼんやりした光を置く
 struct NeonBackdrop: View {
     @Environment(\.palette) private var palette
 
