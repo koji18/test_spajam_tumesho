@@ -43,8 +43,12 @@ struct GameTests {
         play(Move(from: nil, to: Square.index(file: 1, rank: 5), kind: .gold), in: game)
         #expect(game.status == .playing)
         #expect(game.message.hasPrefix("王手になっていません"))
+        #expect(game.isNotCheckNotice)
         #expect(game.position.sfenBoard == start)
         #expect(game.mistakes == 1)  // 盤を揺らす
+        // 次に駒を選んだら、知らせは消える
+        game.tap(hand: .gold)
+        #expect(!game.isNotCheckNotice)
     }
 
     @Test func 間違えると盤を戻し_正解の手を見せる() {
@@ -130,6 +134,37 @@ struct GameTests {
         game.tap(square: Square.index(file: 3, rank: 1))  // 玉のいるマスには打てない（反則ではない）
         #expect(game.selection == nil)
         #expect(game.mistakes == 0)
+    }
+
+    @Test func ノーマルの1問目だけ案内を出し_入門の1段目には出さない() throws {
+        let normal = Game(problem: tutorial)
+        #expect(normal.guide != nil)
+        #expect(normal.guideHandKind == .gold)
+
+        let firstStage = try #require(TutorialStage.all.first)
+        let lesson = Game(problem: firstStage.problem)
+        #expect(lesson.problem.id == 1)  // 入門の問題も番号は 1 から
+        #expect(lesson.guide == nil)
+        #expect(lesson.guideHandKind == nil)
+    }
+
+    @Test func 入門の星_答えを見たら1つ_ミスとヒントでそれぞれ1つ減る() {
+        #expect(TutorialStage.stars(mistakes: 0, hintsUsed: 0, answerUsed: false) == 3)
+        #expect(TutorialStage.stars(mistakes: 2, hintsUsed: 0, answerUsed: false) == 2)
+        #expect(TutorialStage.stars(mistakes: 0, hintsUsed: 1, answerUsed: false) == 2)
+        #expect(TutorialStage.stars(mistakes: 1, hintsUsed: 2, answerUsed: false) == 1)
+        #expect(TutorialStage.stars(mistakes: 0, hintsUsed: 0, answerUsed: true) == 1)
+    }
+
+    @Test func 答えを見たことは_リセットしても残る() {
+        let game = Game(problem: tutorial)
+        game.answerOnDemand = true
+        play(Move(from: nil, to: Square.index(file: 1, rank: 5), kind: .gold), in: game)
+        game.showAnswer()
+        #expect(game.answerUsed)
+        game.reset()
+        #expect(game.answerUsed)
+        #expect(!game.answerShown)
     }
 
     @Test func ヒントは2段まで_2段目で正解の行き先が光る() {

@@ -143,7 +143,8 @@ private struct MateRays: View {
             for i in 0..<64 {
                 let angle = Double(rng.int(0...359)) * .pi / 180 + spin
                 let start = reach * Double(rng.int(6...26)) / 100
-                let end = reach * Double(rng.int(45...110)) / 100 * grow
+                let endRatio: Double = Double(rng.int(45...110)) / 100
+                let end: Double = reach * endRatio * grow
                 let halfWidth = Double(rng.int(1...10))
                 let color = Self.colors[i % Self.colors.count]
                 let path = wedge(center: center, angle: angle, start: start * grow, end: end, halfWidth: halfWidth)
@@ -191,7 +192,11 @@ private struct GoldSplash: View {
             // 墨だまり
             ctx.fill(Path(ellipseIn: CGRect(x: center.x - unit * 0.32, y: center.y - unit * 0.28,
                                             width: unit * 0.64, height: unit * 0.56)), with: .color(ink))
-            for _ in 0..<14 { dot(unit * Double(rng.int(16...34)) / 100, unit * Double(rng.int(4...10)) / 100, .color(ink)) }
+            for _ in 0..<14 {
+                let d1: Double = Double(rng.int(16...34)) / 100
+                let d2: Double = Double(rng.int(4...10)) / 100
+                dot(unit * d1, unit * d2, .color(ink))
+            }
             // 金の筆のはらい。中央のまわりに弧を描く
             for _ in 0..<5 {
                 let a0 = Double(rng.int(0...359)) * .pi / 180
@@ -202,8 +207,14 @@ private struct GoldSplash: View {
                 ctx.stroke(stroke, with: gold, style: StrokeStyle(lineWidth: Double(rng.int(4...12)), lineCap: .round))
             }
             // 金と墨のしぶき
-            for _ in 0..<36 { dot(unit * Double(rng.int(28...58)) / 100, Double(rng.int(2...7)), gold) }
-            for _ in 0..<30 { dot(unit * Double(rng.int(30...55)) / 100, Double(rng.int(2...6)), .color(ink)) }
+            for _ in 0..<36 {
+                let r: Double = Double(rng.int(28...58)) / 100
+                dot(unit * r, Double(rng.int(2...7)), gold)
+            }
+            for _ in 0..<30 {
+                let r: Double = Double(rng.int(30...55)) / 100
+                dot(unit * r, Double(rng.int(2...6)), .color(ink))
+            }
         }
         .allowsHitTesting(false)
     }

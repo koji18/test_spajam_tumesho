@@ -11,7 +11,7 @@ struct SessionTests {
         let session = Session(store: store)
         #expect(session.rating == 1500)
         #expect(session.boardSize == .full)
-        #expect(session.mode == .normal)
+        #expect(session.mode == .tutorial)  // はじめて起動した人は入門から始める
         #expect(session.hapticsOn)
         #expect(!session.tutorialCleared)
         #expect(session.totalScore == 0)
@@ -98,5 +98,24 @@ struct SessionTests {
 
     @Test func 段位のバッジ() {
         #expect(Session(store: store).rankBadge == "初")
+    }
+
+    @Test func 段位の境目と名前() {
+        #expect(Session.rank(for: 1100).badge == "級")
+        #expect(Session.rank(for: 1399).name == "級位")
+        #expect(Session.rank(for: 1400).name == "初段")
+        #expect(Session.rank(for: 1999).badge == "三")
+        #expect(Session.rank(for: 2500).name == "五段")
+    }
+
+    @Test func 次の段までの進み具合() throws {
+        let next = try #require(Session.nextRank(for: 1500))
+        #expect(next.rank.name == "二段")
+        #expect(next.remaining == 100)
+        #expect(next.fraction == 0.5)
+        let fromKyu = try #require(Session.nextRank(for: 1300))
+        #expect(fromKyu.rank.name == "初段")
+        #expect(fromKyu.fraction == 0.5)  // 級位のゲージは 1200 から
+        #expect(Session.nextRank(for: 2200) == nil)  // 最高段
     }
 }

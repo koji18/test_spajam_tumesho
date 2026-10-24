@@ -10,6 +10,7 @@ final class Game {
     }
 
     enum Status: Equatable {
+        var isFailed: Bool { if case .failed = self { return true } else { return false } }
         case playing
         case thinking                 // 玉方が応手を考えている
         case solved(tesuji: String?)
@@ -33,12 +34,19 @@ final class Game {
     private(set) var hintSources: Set<Int> = []
     private(set) var hintHandKinds: Set<Kind> = []
     private(set) var hintTargets: Set<Int> = []
-    /// 間違えたときに盤で見せる正解の手
-    private(set) var revealedAnswer: Move?
+    /// 間違えたときに盤で見せる正解の手。入門では、答えを見るボタンを押すまで見せない（answerOnDemand）
+    private var answerMove: Move?
+    private(set) var answerShown = false
+    /// この問題で一度でも「答えを見る」を押したか。リセットしても残し、入門の星を 1 つにするのに使う
+    private(set) var answerUsed = false
+    var answerOnDemand = false
+    var revealedAnswer: Move? { answerOnDemand && !answerShown ? nil : answerMove }
     /// 間違えたときに盤で見せる、玉方の防ぎ方（指す前の盤に重ねて、そのマスを光らせる）
     private(set) var refutation: Move?
     /// 間違えた回数（王手でない手を指そうとしたときも数える）。盤を揺らすきっかけに使う
     private(set) var mistakes = 0
+    /// 王手になっていない手を指そうとして、その知らせを出しているところか。次に駒を選ぶか、指すか、リセットすると消える
+    private(set) var notCheckNotice = false
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
@@ -58,9 +66,10 @@ final class Game {
         message = Self.prompt(for: problem)
     }
 
-    /// 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる
+    /// 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる。
+    /// 入門の問題は、説明を画面の上のカードに出すので、ここは空にしておく
     private static func prompt(for problem: Problem) -> String {
-        problem.id == 1 ? "王手をかけて、玉を詰ませよう" : ""
+        isFirstNormalProblem(problem) ? "王手をかけて、玉を詰ませよう" : ""
     }
 
     struct HandItem: Identifiable {
@@ -106,7 +115,13 @@ final class Game {
 
     var guideHandKind: Kind? { isGuiding && selection == nil ? .gold : nil }
 
-    private var isGuiding: Bool { problem.id == 1 && status == .playing && lastMove == nil }
+    private var isGuiding: Bool { Self.isFirstNormalProblem(problem) && status == .playing && lastMove == nil }
+
+    /// ノーマルの 1 問目（頭金の例題）か。入門の問題も id が 1〜7 なので、番号だけでなく入門の問題でないことも確かめる。
+    /// 上の一文・案内・金の点滅の枠は、この問題だけに出す
+    static func isFirstNormalProblem(_ problem: Problem) -> Bool {
+        problem.id == 1 && problem.lesson == nil
+    }
 
     // MARK: ヒント
 
@@ -203,6 +218,22 @@ final class Game {
         attempt(promote ? pending.promote : pending.stay)
     }
 
+    /// 答えを見る。王手でない手を指して失敗にならなかったときは、いまの局面から正解を求める
+    func showAnswer() {
+        if answerMove == nil { answerMove = position.mateMoves(plies: pliesLeft, where: filter).first }
+        answerShown = true
+        answerUsed = true
+    }
+
+    /// 見せている正解の手の説明（「３二に金を打つ」など）
+    var answerText: String? {
+        guard answerShown, let m = answerMove else { return nil }
+        return Notation.describe(m, in: position)
+    }
+
+    /// 王手になっていない手を指したあとの知らせが出ているか
+    var isNotCheckNotice: Bool { status == .playing && notCheckNotice }
+
     /// 盤面を問題の最初に戻す
     func reset() {
         position = problem.position
@@ -214,16 +245,23 @@ final class Game {
         lastMove = nil
         hintLevel = 0
         refreshHints()
-        revealedAnswer = nil
+        answerMove = nil
+        answerShown = false
         refutation = nil
         replyTask?.cancel()
         replyTask = nil
         firstMoveCaptured = false
+        notCheckNotice = false
         startedAt = Date()
     }
 
     /// 駒か持ち駒を選び、動けるマスを計算し直す
     private func select(_ s: Selection?) {
+        // 王手でなかったときの知らせは、次に駒を選んだら消す
+        if notCheckNotice {
+            notCheckNotice = false
+            message = Self.prompt(for: problem)
+        }
         selection = s
         targets = Set(candidateMoves().map(\.to))
     }
@@ -245,6 +283,7 @@ final class Game {
         select(nil)
         guard position.givesCheck(m) else {
             mistakes += 1
+            notCheckNotice = true
             message = "王手になっていません。詰将棋は毎回王手をかけます"
             return
         }
@@ -256,7 +295,8 @@ final class Game {
         // 間違えたら指す前の盤に戻し、正解の駒と行き先を盤で見せる
         guard answers.contains(m) else {
             mistakes += 1
-            revealedAnswer = answers.first
+            answerMove = answers.first
+            answerShown = false
             let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)
             // 玉方がどう防ぐかを見せる
@@ -270,6 +310,9 @@ final class Game {
         }
         position = before.playing(m)
         lastMove = m
+        // 正しい手を指したので、見せていた正解は片づける（3 手詰めの次の手で古い答えが残らないように）
+        answerMove = nil
+        answerShown = false
         if position.isMate {
             let tesuji = firstMoveCaptured ? "捨て駒" : Notation.tesuji(m, in: before, captured: false)
             solvedSeconds = Int(Date().timeIntervalSince(startedAt ?? Date()))

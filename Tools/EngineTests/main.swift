@@ -92,6 +92,13 @@ for size in BoardSize.allCases {
     expect(ProblemGenerator.evaluate(q.position, size: .small, plies: 1)?.answer == q.answer, "\(size) 1問目：問題の条件を満たす")
 }
 
+print("入門チュートリアル")
+for stage in TutorialStage.all {
+    let q = stage.problem
+    check(q, "第\(stage.number)段 \(stage.title)")
+}
+expect(TutorialStage.all.map(\.number) == Array(1...TutorialStage.all.count), "段の番号が 1 から順に並ぶ")
+
 print("アプリと同じ方法で作った問題")
 for size in BoardSize.allCases {
     var generator = ProblemGenerator(seed: 7)

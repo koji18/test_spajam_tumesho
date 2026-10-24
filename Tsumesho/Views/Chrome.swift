@@ -22,7 +22,7 @@ struct TopBar: View {
                         .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 10)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("モード：\(session.mode == .normal ? "ノーマル" : "タイムトライアル")")
+                .accessibilityLabel("モード：\(session.mode.label)")
                 .accessibilityHint("メニューを開きます")
 
                 Spacer()
@@ -53,13 +53,15 @@ struct TopBar: View {
     }
 }
 
-/// モードのアイコン。ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
+/// モードのアイコン。入門は学帽、ノーマルは「＋」の入った駒、タイムトライアルはストップウォッチ
 struct ModeIcon: View {
     let mode: PlayMode
     var size: CGFloat = 22
 
     var body: some View {
         switch mode {
+        case .tutorial:
+            Image(systemName: "graduationcap").font(.system(size: size))
         case .normal:
             ZStack {
                 KomaShape().stroke(lineWidth: 1.8).frame(width: size * 0.82, height: size)
@@ -83,6 +85,7 @@ struct MenuPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             row(title: "ホーム", selected: false, action: onHome) { Image(systemName: "house") }
+            row(title: "チュートリアル", selected: session.mode == .tutorial, action: { onMode(.tutorial) }) { ModeIcon(mode: .tutorial, size: 20) }
             row(title: "ノーマル", selected: session.mode == .normal, action: { onMode(.normal) }) { ModeIcon(mode: .normal, size: 20) }
             row(title: "タイムトライアル", selected: session.mode == .timeTrial, action: { onMode(.timeTrial) }) { ModeIcon(mode: .timeTrial, size: 20) }
             row(title: "記録", selected: false, action: onRecords) { Image(systemName: "chart.bar") }

@@ -25,6 +25,8 @@ struct Problem: Identifiable {
     let board: String   // SFEN の盤面部分
     let hand: String    // 攻め方の持ち駒
     let answer: String  // 正解の初手（確認用）
+    // 入門チュートリアルの問題だけが持つ、この問題で学ぶことの説明（Tutorial.swift）
+    var lesson: String? = nil
 
     var position: Position { Position(problem: board, attackerHand: hand) }
 

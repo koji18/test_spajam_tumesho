@@ -176,7 +176,7 @@ struct ProblemPage: View {
         switch game.status {
         case .failed: Theme.neonPink
         case .thinking: palette.subText
-        default: game.message.hasPrefix("王手になって") ? Theme.hint : palette.text
+        default: game.isNotCheckNotice ? Theme.hint : palette.text
         }
     }
 

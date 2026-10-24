@@ -2,10 +2,26 @@ import Foundation
 import Observation
 
 enum PlayMode: String {
+    case tutorial
     case normal
     case timeTrial
 
-    var title: String { self == .normal ? "NORMAL" : "TIME TRIAL" }
+    var title: String {
+        switch self {
+        case .tutorial: "TUTORIAL"
+        case .normal: "NORMAL"
+        case .timeTrial: "TIME TRIAL"
+        }
+    }
+
+    /// 読み上げなどに使う日本語の名前
+    var label: String {
+        switch self {
+        case .tutorial: "チュートリアル"
+        case .normal: "ノーマル"
+        case .timeTrial: "タイムトライアル"
+        }
+    }
 }
 
 // 遊び方の設定と成績。問題のページをまたいで共有し、次に起動したときも残す
@@ -20,6 +36,18 @@ final class Session {
     var soundVolume: Double { didSet { store.set(soundVolume, forKey: "soundVolume") } }
     /// 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
+
+    // 入門チュートリアルの、段ごとの星（0 はまだ解いていない）。段はいつでも好きな順に行き来できる
+    private(set) var tutorialStars: [Int] { didSet { store.set(tutorialStars, forKey: "tutorialStars") } }
+    var tutorialSolved: Int { tutorialStars.filter { $0 > 0 }.count }
+    var tutorialDone: Bool { tutorialSolved >= TutorialStage.all.count }
+    // 次に挑む段（最初の未クリアの段。全部終えていれば最初）
+    var tutorialNext: Int { tutorialStars.firstIndex(of: 0) ?? 0 }
+
+    func recordTutorial(stage: Int, stars: Int) {
+        guard tutorialStars.indices.contains(stage) else { return }
+        tutorialStars[stage] = max(tutorialStars[stage], stars)
+    }
 
     var palette: Palette { tutorialCleared ? .neon : .classic }
 
@@ -38,7 +66,11 @@ final class Session {
     /// 保存してある設定と成績を読み込む。テストでは store にテスト専用の保存先を渡す
     init(store: UserDefaults = .standard) {
         self.store = store
-        mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
+        // はじめて起動したときは、入門から始める。すでに遊んでいる人はノーマルのまま
+        let played = store.integer(forKey: "solvedTotal") > 0
+        mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? (played ? .normal : .tutorial)
+        let saved = store.array(forKey: "tutorialStars") as? [Int] ?? []
+        tutorialStars = (0..<TutorialStage.all.count).map { $0 < saved.count ? saved[$0] : 0 }
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
         soundVolume = store.object(forKey: "soundVolume") as? Double ?? 0.8
@@ -109,17 +141,45 @@ final class Session {
         timeTrialBest = max(timeTrialBest, solved)
     }
 
-    /// レーティングに応じた段位のバッジ
-    var rankBadge: String {
-        switch rating {
-        case ..<1400: "級"
-        case ..<1600: "初"
-        case ..<1800: "二"
-        case ..<2000: "三"
-        case ..<2200: "四"
-        default: "五"
-        }
+    /// 段位。レーティングが lowerBound 以上になると、その段位になる
+    struct Rank: Equatable {
+        let badge: String     // バッジの一文字（級・初・二…）
+        let lowerBound: Int
+
+        /// 段位の名前（級位・初段・二段…）
+        var name: String { Rank.name(ofBadge: badge) }
+
+        /// バッジの一文字から段位の名前を作る
+        static func name(ofBadge badge: String) -> String { badge == "級" ? "級位" : "\(badge)段" }
     }
 
-    var rankName: String { rankBadge == "級" ? "級位" : "\(rankBadge)段" }
+    /// 段位の一覧。段位の境目と名前は、ここだけで決める。級位の lowerBound は、ホームのゲージの起点
+    static let ranks: [Rank] = [
+        Rank(badge: "級", lowerBound: 1200),
+        Rank(badge: "初", lowerBound: 1400),
+        Rank(badge: "二", lowerBound: 1600),
+        Rank(badge: "三", lowerBound: 1800),
+        Rank(badge: "四", lowerBound: 2000),
+        Rank(badge: "五", lowerBound: 2200),
+    ]
+
+    /// rating のときの段位
+    static func rank(for rating: Int) -> Rank {
+        ranks.last { rating >= $0.lowerBound && $0.badge != "級" } ?? ranks[0]
+    }
+
+    /// 次の段位と、そこまでの進み具合（0〜1）と、あと何点か。最高段なら nil
+    static func nextRank(for rating: Int) -> (rank: Rank, fraction: Double, remaining: Int)? {
+        let current = rank(for: rating)
+        guard let i = ranks.firstIndex(of: current), i + 1 < ranks.count else { return nil }
+        let next = ranks[i + 1]
+        let span = Double(next.lowerBound - current.lowerBound)
+        let fraction = min(1, max(0, Double(rating - current.lowerBound) / span))
+        return (next, fraction, next.lowerBound - rating)
+    }
+
+    /// レーティングに応じた段位のバッジ
+    var rankBadge: String { Self.rank(for: rating).badge }
+
+    var rankName: String { Self.rank(for: rating).name }
 }

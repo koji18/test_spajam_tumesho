@@ -52,6 +52,6 @@ struct HolographicBadge: View {
         .rotation3DEffect(.degrees(-y * 8), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
         .rotation3DEffect(.degrees(x * 8), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title == "級" ? "級位" : "\(title)段")
+        .accessibilityLabel(Session.Rank.name(ofBadge: title))
     }
 }
