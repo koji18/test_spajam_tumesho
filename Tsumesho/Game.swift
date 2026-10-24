@@ -43,6 +43,8 @@ final class Game {
     private(set) var refutation: Move?
     /// 間違えた回数（王手でない手を指そうとしたときも数える）。盤を揺らすきっかけに使う
     private(set) var mistakes = 0
+    /// 王手になっていない手を指そうとして、その知らせを出しているところか。次に駒を選ぶか、指すか、リセットすると消える
+    private(set) var notCheckNotice = false
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
@@ -227,7 +229,7 @@ final class Game {
     }
 
     /// 王手になっていない手を指したあとの知らせが出ているか
-    var isNotCheckNotice: Bool { status == .playing && message.hasPrefix("王手になって") }
+    var isNotCheckNotice: Bool { status == .playing && notCheckNotice }
 
     /// 盤面を問題の最初に戻す
     func reset() {
@@ -246,13 +248,17 @@ final class Game {
         replyTask?.cancel()
         replyTask = nil
         firstMoveCaptured = false
+        notCheckNotice = false
         startedAt = Date()
     }
 
     /// 駒か持ち駒を選び、動けるマスを計算し直す
     private func select(_ s: Selection?) {
         // 王手でなかったときの知らせは、次に駒を選んだら消す
-        if message.hasPrefix("王手になって") { message = Self.prompt(for: problem) }
+        if notCheckNotice {
+            notCheckNotice = false
+            message = Self.prompt(for: problem)
+        }
         selection = s
         targets = Set(candidateMoves().map(\.to))
     }
@@ -274,6 +280,7 @@ final class Game {
         select(nil)
         guard position.givesCheck(m) else {
             mistakes += 1
+            notCheckNotice = true
             message = "王手になっていません。詰将棋は毎回王手をかけます"
             return
         }

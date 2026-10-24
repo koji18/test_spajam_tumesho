@@ -400,7 +400,7 @@ private struct StagePage: View {
             } else if let guide = game.guide {
                 Label(guide, systemImage: "hand.point.up.left.fill").foregroundStyle(Washi.vermilion)
             } else {
-                Text(game.message).foregroundStyle(game.message.hasPrefix("王手になって") ? Washi.vermilion : Washi.ink)
+                Text(game.message).foregroundStyle(game.isNotCheckNotice ? Washi.vermilion : Washi.ink)
             }
         }
         .font(.system(size: 14, weight: .semibold))

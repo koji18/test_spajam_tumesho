@@ -43,8 +43,12 @@ struct GameTests {
         play(Move(from: nil, to: Square.index(file: 1, rank: 5), kind: .gold), in: game)
         #expect(game.status == .playing)
         #expect(game.message.hasPrefix("王手になっていません"))
+        #expect(game.isNotCheckNotice)
         #expect(game.position.sfenBoard == start)
         #expect(game.mistakes == 1)  // 盤を揺らす
+        // 次に駒を選んだら、知らせは消える
+        game.tap(hand: .gold)
+        #expect(!game.isNotCheckNotice)
     }
 
     @Test func 間違えると盤を戻し_正解の手を見せる() {
