@@ -1,8 +1,10 @@
 import SwiftUI
 
-// 最初のページ。遊び方を 3 点だけ伝える。駒の動き方は教えない
+// 最初の画面。遊び方を 3 点だけ伝え、盤の大きさを選んで始める。駒の動き方は教えない。
+// 盤の大きさは遊んでいる間は変えられない。変えたいときは問題画面の「トップ」からここに戻る
 struct IntroPage: View {
-    let insets: EdgeInsets
+    let onStart: () -> Void
+    @Environment(Session.self) private var session
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -10,7 +12,7 @@ struct IntroPage: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("1問1分の\n詰将棋").font(.system(size: 40, weight: .heavy)).foregroundStyle(Theme.ink)
-                Text("相手の玉を、逃げられなくしたら勝ち。\n駒の動き方は覚えなくて大丈夫です。")
+                Text("相手の玉を、逃げられなくしたら勝ち。\n駒の動き方は覚えなくて大丈夫です。\n問題はアプリがその場で作るので、ずっと続きます。")
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.soft)
             }
@@ -32,21 +34,37 @@ struct IntroPage: View {
                 }
             }
 
+            boardSizePicker
+
             Spacer(minLength: 0)
 
-            VStack(spacing: 6) {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 22, weight: .bold))
-                    .symbolEffect(.bounce, options: .repeating)
-                Text("上にスワイプして始める").font(.system(size: 15, weight: .semibold))
+            Button(action: onStart) {
+                Text("はじめる")
+                    .font(.system(size: 18, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
             }
-            .foregroundStyle(Theme.accent)
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .foregroundStyle(Theme.background)
         }
         .padding(.horizontal, 24)
-        .padding(.top, insets.top + 12)
-        .padding(.bottom, insets.bottom + 20)
-        .background(Theme.background)
+        .padding(.top, 12)
+        .padding(.bottom, 20)
+        .background(Theme.background.ignoresSafeArea())
+    }
+
+    private var boardSizePicker: some View {
+        @Bindable var session = session
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("盤の大きさ").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.soft)
+            Picker("盤の大きさ", selection: $session.smallBoard) {
+                Text("9×9（普通の盤）").tag(false)
+                Text("5×5（玉のまわりだけ）").tag(true)
+            }
+            .pickerStyle(.segmented)
+            Text("5×5 と 9×9 では、出る問題が違います。遊び始めたあとに変えたいときは、問題画面の「トップ」からこの画面に戻ってください").font(.system(size: 12)).foregroundStyle(Theme.soft)
+        }
     }
 
     private func rule<Icon: View>(no: String, title: String, text: String, @ViewBuilder icon: () -> Icon) -> some View {

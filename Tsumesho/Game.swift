@@ -217,9 +217,13 @@ final class Game {
     }
 }
 
-// 連続正解数。問題のページをまたいで共有する
+// 連続正解数と盤の大きさの設定。問題のページをまたいで共有する
 @MainActor @Observable
 final class Session {
+    // 盤の大きさ（true で 5×5）。次に起動したときも同じ大きさで始める
+    var smallBoard = UserDefaults.standard.bool(forKey: "smallBoard") {
+        didSet { UserDefaults.standard.set(smallBoard, forKey: "smallBoard") }
+    }
     private(set) var streak = 0
     private(set) var best = 0
     private(set) var solvedCount = 0
