@@ -28,7 +28,7 @@ struct IntroPage: View {
         }
         .padding(.horizontal, 24)
         .padding(.top, 8)
-        .padding(.bottom, 14)
+        .padding(.bottom, 30)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PaperBackground())
         .environment(\.palette, .classic)
@@ -172,29 +172,33 @@ struct IntroPage: View {
 
     // MARK: 下の段（選択と、大きな駒のボタン）
 
+    // 下の段。モードの札はいつも同じ位置に置き、盤の大きさの札はその下に出す。
+    // チュートリアルでは盤の大きさを選ばないので、場所は空けたまま札だけを消す（モードの位置が動かないように）
     private var bottomRow: some View {
-        HStack(alignment: .bottom, spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
-                tabGroup(title: "モード") {
-                    tab("入門", selected: session.mode == .tutorial) { session.mode = .tutorial }
-                    tab("ノーマル", selected: session.mode == .normal) { session.mode = .normal }
-                    tab("タイム", selected: session.mode == .timeTrial) { session.mode = .timeTrial }
-                }
-                modeNote
-                if session.mode != .tutorial {
-                    tabGroup(title: "盤の大きさ") {
-                        ForEach(BoardSize.allCases, id: \.self) { size in
-                            tab(kanji(size), selected: session.boardSize == size) { session.boardSize = size }
-                        }
+        VStack(alignment: .leading, spacing: 12) {
+            tabGroup(title: "モード") {
+                tab("チュートリアル", selected: session.mode == .tutorial) { session.mode = .tutorial }
+                tab("ノーマル", selected: session.mode == .normal) { session.mode = .normal }
+                tab("タイム", selected: session.mode == .timeTrial) { session.mode = .timeTrial }
+            }
+            modeNote
+            HStack(alignment: .top, spacing: 14) {
+                tabGroup(title: "盤の大きさ") {
+                    ForEach(BoardSize.allCases, id: \.self) { size in
+                        tab(kanji(size), selected: session.boardSize == size) { session.boardSize = size }
                     }
                 }
+                .opacity(session.mode == .tutorial ? 0 : 1)
+                .allowsHitTesting(session.mode != .tutorial)
+                .accessibilityHidden(session.mode == .tutorial)
+                .animation(.easeOut(duration: 0.2), value: session.mode)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                startPiece
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            startPiece
         }
     }
 
-    // 選んでいるモードの一言。入門では、いまどこまで進んだかを出す
+    // 選んでいるモードの一言。チュートリアルでは、いまどこまで進んだかを出す
     @ViewBuilder
     private var modeNote: some View {
         let text: String = switch session.mode {
@@ -207,13 +211,14 @@ struct IntroPage: View {
         }
         Text(text)
             .font(.system(size: 11)).foregroundStyle(Washi.inkSoft)
+            .frame(minHeight: 14, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private var startCaption: String {
         switch session.mode {
         case .tutorial:
-            session.tutorialDone ? "入門をもう一度" : (session.tutorialSolved > 0 ? "第\(session.tutorialNext + 1)段から" : "はじめから")
+            session.tutorialDone ? "もう一度" : (session.tutorialSolved > 0 ? "第\(session.tutorialNext + 1)段から" : "はじめから")
         default:
             session.solvedTotal > 0 ? "つづきから" : "はじめから"
         }

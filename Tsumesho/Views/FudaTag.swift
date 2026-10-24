@@ -19,8 +19,8 @@ struct FudaShape: Shape {
     }
 }
 
-// ホーム画面のメニューに使う木札。上に紐を通す穴があり、選んでいる札は木の色が濃く、朱の文字で、少し浮く。
-// 選んでいない札は色が薄く、板に近い位置にある
+// ホーム画面のメニューに使う木札。上に紐を通す穴があり、選んでいる札は木の色が濃く、朱の文字で、影が深い。
+// 選んでいない札は色が薄い。選んでも位置は動かない
 struct FudaTag: View {
     let text: String
     var selected = false
@@ -37,7 +37,6 @@ struct FudaTag: View {
             .overlay(alignment: .top) { hole }
             .overlay { FudaShape().stroke(selected ? Washi.vermilion : Washi.kayaEdge.opacity(0.65), lineWidth: selected ? 2 : 1) }
             .shadow(color: .black.opacity(selected ? 0.3 : 0.14), radius: selected ? 4 : 1.5, x: 0, y: selected ? 5 : 2)
-            .offset(y: selected ? -3 : 0)
             .animation(.spring(response: 0.25, dampingFraction: 0.65), value: selected)
     }
 

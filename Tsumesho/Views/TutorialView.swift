@@ -533,7 +533,7 @@ private struct TutorialFinish: View {
             .shadow(color: Washi.vermilion.opacity(0.3), radius: 8, y: 4)
 
             VStack(spacing: 6) {
-                Text("入門 修了").font(Theme.koma(30)).foregroundStyle(Washi.ink)
+                Text("チュートリアル 修了").font(Theme.koma(30)).foregroundStyle(Washi.ink)
                 Text("王手・成り・読み・捨て駒。詰将棋の基本はこれで一通りです。")
                     .font(.system(size: 13)).foregroundStyle(Washi.inkSoft)
                     .multilineTextAlignment(.center)
