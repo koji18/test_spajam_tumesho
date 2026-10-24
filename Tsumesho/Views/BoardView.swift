@@ -80,6 +80,18 @@ struct KomaView: View {
 struct BoardView: View {
     let game: Game
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 動かした駒の分身。指した瞬間に元のマスに置き、行き先まで滑らせる。着くまで行き先の本物は隠す
+    struct Flight: Equatable {
+        let id = UUID()
+        let move: Move
+        let piece: Piece
+        var arrived = false
+    }
+    @State private var flight: Flight?
+    /// 持ち駒を打ったマス。打った駒を少し大きく出してから縮めて収める
+    @State private var droppedSquare: Int?
 
     var body: some View {
         let files = Array(game.visibleFiles.reversed())  // 左から ９ ８ … １（5×5 では切り出した 5 筋）
@@ -120,6 +132,15 @@ struct BoardView: View {
                 .overlay(alignment: .trailing) { edge(horizontal: false) }
                 .offset(y: labelSize)
 
+                if let flight, let from = flight.move.from,
+                   let start = center(of: from, files: files, ranks: ranks, cell: cell, labelSize: labelSize),
+                   let end = center(of: flight.move.to, files: files, ranks: ranks, cell: cell, labelSize: labelSize) {
+                    koma(flight.piece, size: cell)
+                        .frame(width: cell, height: cell)
+                        .position(flight.arrived ? end : start)
+                        .allowsHitTesting(false)
+                }
+
                 ForEach(Array(ranks.enumerated()), id: \.element) { j, r in
                     Text(Notation.rankLabel(r))
                         .font(.system(size: files.count > 5 ? 10 : 11, weight: .bold))
@@ -131,6 +152,47 @@ struct BoardView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
         .aspectRatio(1, contentMode: .fit)
+        .onChange(of: game.lastMove) { _, move in
+            if let move { animate(move) }
+        }
+    }
+
+    /// 指した手を動きで見せる。盤の上の駒は滑らせ、打った駒は大きく出してから収める
+    private func animate(_ move: Move) {
+        guard !reduceMotion, let piece = game.position.board[move.to] else { return }
+        if move.from != nil {
+            let f = Flight(move: move, piece: piece)
+            flight = f
+            Task {
+                // 分身を元のマスに一度描いてから動かす
+                try? await Task.sleep(for: .milliseconds(16))
+                withAnimation(.easeOut(duration: 0.22)) { flight?.arrived = true }
+                try? await Task.sleep(for: .milliseconds(240))
+                if flight?.id == f.id { flight = nil }
+            }
+        } else {
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { droppedSquare = move.to }
+            Task {
+                try? await Task.sleep(for: .milliseconds(16))
+                withAnimation(.spring(duration: 0.35, bounce: 0.5)) { droppedSquare = nil }
+            }
+        }
+    }
+
+    /// マスの中心の座標。表示範囲の外のマスなら nil
+    private func center(of square: Int, files: [Int], ranks: [Int], cell: CGFloat, labelSize: CGFloat) -> CGPoint? {
+        guard let i = files.firstIndex(of: Square.file(square)),
+              let j = ranks.firstIndex(of: Square.rank(square)) else { return nil }
+        return CGPoint(x: (CGFloat(i) + 0.5) * cell, y: labelSize + (CGFloat(j) + 0.5) * cell)
+    }
+
+    /// 盤の上の駒。玉方は逆さにしてピンク、攻め方はシアンで光らせる
+    private func koma(_ piece: Piece, size: CGFloat) -> some View {
+        KomaView(label: Notation.label(piece), promoted: piece.promoted,
+                 upsideDown: piece.side == .white, size: size,
+                 tone: piece.side == .white ? .defender : .attacker)
     }
 
     /// 盤の外枠の光る線
@@ -190,10 +252,10 @@ struct BoardView: View {
                     RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ok, lineWidth: 3).padding(2)
                 }
-                if let piece {
-                    KomaView(label: Notation.label(piece), promoted: piece.promoted,
-                             upsideDown: piece.side == .white, size: size,
-                             tone: piece.side == .white ? .defender : .attacker)
+                // 動いている途中の駒は、分身が着くまで隠す
+                if let piece, flight?.move.to != i {
+                    koma(piece, size: size)
+                        .scaleEffect(droppedSquare == i ? 1.45 : 1)
                 }
             }
             .frame(width: size, height: size)
