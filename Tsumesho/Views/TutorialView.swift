@@ -83,6 +83,9 @@ struct TutorialView: View {
                     Text("ホーム").font(.system(size: 14, weight: .semibold))
                 }
                 .foregroundStyle(Washi.inkSoft)
+                .padding(.trailing, 16)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             Spacer()
@@ -488,12 +491,16 @@ private struct StagePage: View {
     }
 
     private func helpButton(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
-        Button(title, action: action)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(filled ? Washi.paper : Washi.vermilion)
-            .frame(maxWidth: .infinity, minHeight: 38)
-            .background(RoundedRectangle(cornerRadius: 4).fill(filled ? Washi.vermilion : Color.clear))
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: filled ? 0 : 1.5))
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(filled ? Washi.paper : Washi.vermilion)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(RoundedRectangle(cornerRadius: 4).fill(filled ? Washi.vermilion : Color.clear))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: filled ? 0 : 1.5))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 下のボタン
@@ -513,11 +520,17 @@ private struct StagePage: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(RoundedRectangle(cornerRadius: 6).fill(Washi.vermilion))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                Button("もう一度解く", action: retry)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Washi.inkSoft)
+                Button(action: retry) {
+                    Text("もう一度解く")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Washi.inkSoft)
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
@@ -534,18 +547,24 @@ private struct StagePage: View {
                 .padding(.vertical, 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
-            HStack(spacing: 28) {
+            HStack(spacing: 0) {
                 Button { game.showHint() } label: {
                     Label(game.hintLevel == 0 ? "ヒント" : (game.hintLevel == 1 ? "もう一段" : "ヒント済み"), systemImage: "lightbulb")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .disabled(game.hintLevel >= 2)
                 Button { game.reset() } label: {
                     Label("やり直し", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(Washi.inkSoft)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 24)
         }
     }
 }
@@ -627,11 +646,17 @@ private struct TutorialFinish: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
                         .background(RoundedRectangle(cornerRadius: 6).fill(Washi.vermilion))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                Button("もう一度やる", action: onRestart)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Washi.inkSoft)
+                Button(action: onRestart) {
+                    Text("もう一度やる")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Washi.inkSoft)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 24)
