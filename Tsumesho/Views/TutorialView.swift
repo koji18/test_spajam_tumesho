@@ -197,6 +197,11 @@ private struct StagePage: View {
             bottomBar
         }
         .onAppear { game.start() }
+        // 成れる手を指したときの確認。ないと、第1段の歩・第2段の銀・第5段の桂馬が指せない
+        .confirmationDialog("成りますか？", isPresented: promotionBinding, titleVisibility: .visible) {
+            Button("成る") { game.choosePromotion(true) }
+            Button("成らない") { game.choosePromotion(false) }
+        }
         .onChange(of: game.status) { _, status in
             switch status {
             case .solved: solved()
@@ -208,6 +213,10 @@ private struct StagePage: View {
         }
         .sensoryFeedback(trigger: game.lastMove) { _, _ in session.hapticsOn ? .selection : nil }
         .animation(.spring(duration: 0.35), value: game.status)
+    }
+
+    private var promotionBinding: Binding<Bool> {
+        Binding(get: { game.pendingPromotion != nil }, set: { if !$0 { game.pendingPromotion = nil } })
     }
 
     // 入門では、間違えてもすぐには答えを見せず、「答えを見る」を押したときだけ見せる
