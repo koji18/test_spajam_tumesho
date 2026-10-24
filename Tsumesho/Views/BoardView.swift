@@ -31,14 +31,14 @@ struct KomaView: View {
     }
 }
 
-// 1〜5 筋 × 一〜五段を切り出した盤。右と上が本物の盤の端
+// 将棋盤。9×9 の普通の盤か、玉のまわりの 5×5 を切り出した盤を表示する。
+// 本物の盤の端は太い線、切り出した辺は細い線で描く
 struct BoardView: View {
     let game: Game
 
-    private let files = Array(Game.files.reversed())  // 左から ５ ４ ３ ２ １
-    private let ranks = Array(Game.ranks)
-
     var body: some View {
+        let files = Array(game.visibleFiles.reversed())  // 左から ９ ８ … １（5×5 では切り出した 5 筋）
+        let ranks = Array(game.visibleRanks)
         GeometryReader { geo in
             let labelSize: CGFloat = 18
             let cell = (geo.size.width - labelSize) / CGFloat(files.count)
@@ -49,7 +49,7 @@ struct BoardView: View {
                     }
                     Spacer().frame(width: labelSize)
                 }
-                .font(Theme.mono(11))
+                .font(Theme.mono(files.count > 5 ? 10 : 11))
                 .foregroundStyle(Theme.soft)
 
                 HStack(spacing: 0) {
@@ -63,20 +63,47 @@ struct BoardView: View {
                         }
                     }
                     .background(Theme.wood)
-                    .overlay(alignment: .top) { Rectangle().fill(Theme.woodLine).frame(height: 3) }
-                    .overlay(alignment: .trailing) { Rectangle().fill(Theme.woodLine).frame(width: 3) }
+                    .overlay { stars(files: files, ranks: ranks, cell: cell) }
+                    .overlay(alignment: .top) { edge(isReal: ranks.first == 1, horizontal: true) }
+                    .overlay(alignment: .bottom) { edge(isReal: ranks.last == 9, horizontal: true) }
+                    .overlay(alignment: .leading) { edge(isReal: files.first == 9, horizontal: false) }
+                    .overlay(alignment: .trailing) { edge(isReal: files.last == 1, horizontal: false) }
 
                     VStack(spacing: 0) {
                         ForEach(ranks, id: \.self) { r in
                             Text(Notation.rankLabel(r)).frame(width: labelSize, height: cell)
                         }
                     }
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: files.count > 5 ? 10 : 11, weight: .bold))
                     .foregroundStyle(Theme.soft)
                 }
             }
         }
         .aspectRatio(1, contentMode: .fit)
+        .animation(.easeInOut(duration: 0.25), value: game.smallBoard)
+    }
+
+    private func edge(isReal: Bool, horizontal: Bool) -> some View {
+        let width: CGFloat = isReal ? 3 : 1
+        return Rectangle()
+            .fill(Theme.woodLine.opacity(isReal ? 1 : 0.5))
+            .frame(width: horizontal ? nil : width, height: horizontal ? width : nil)
+            .allowsHitTesting(false)
+    }
+
+    // 星（盤の目印の点）。三段と四段、六段と七段の間、３筋と４筋、６筋と７筋の間の交点に打つ
+    private func stars(files: [Int], ranks: [Int], cell: CGFloat) -> some View {
+        let xs = [7, 4].compactMap { f in files.firstIndex(of: f).flatMap { i in i + 1 < files.count ? CGFloat(i + 1) * cell : nil } }
+        let ys = [3, 6].compactMap { r in ranks.firstIndex(of: r).flatMap { i in i + 1 < ranks.count ? CGFloat(i + 1) * cell : nil } }
+        return ZStack(alignment: .topLeading) {
+            ForEach(xs, id: \.self) { x in
+                ForEach(ys, id: \.self) { y in
+                    Circle().fill(Theme.woodLine).frame(width: 5, height: 5).position(x: x, y: y)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -87,6 +114,7 @@ struct BoardView: View {
         let isLast = game.lastMove?.to == i
         let isHintSource = game.hintSources.contains(i)
         let isHintTarget = game.hintTargets.contains(i)
+        let isRevealed = game.revealedAnswer.map { $0.from == i || $0.to == i } ?? false
 
         Button {
             game.tap(square: i)
@@ -98,6 +126,10 @@ struct BoardView: View {
                 if isSelected { RoundedRectangle(cornerRadius: 4).fill(Theme.accent.opacity(0.85)).padding(2) }
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
+                }
+                if isRevealed {
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ok, lineWidth: 3).padding(2)
                 }
                 if let piece {
                     KomaView(label: Notation.label(piece), promoted: piece.promoted,

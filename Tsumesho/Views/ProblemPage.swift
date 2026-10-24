@@ -3,15 +3,15 @@ import SwiftUI
 // 縦スワイプの 1 ページ。1 問ぶん
 struct ProblemPage: View {
     let problem: Problem
-    let total: Int
     let insets: EdgeInsets
+    let onExit: () -> Void
     @Environment(Session.self) private var session
     @State private var game: Game
 
-    init(problem: Problem, total: Int, insets: EdgeInsets) {
+    init(problem: Problem, insets: EdgeInsets, onExit: @escaping () -> Void) {
         self.problem = problem
-        self.total = total
         self.insets = insets
+        self.onExit = onExit
         _game = State(initialValue: Game(problem: problem))
     }
 
@@ -81,16 +81,33 @@ struct ProblemPage: View {
     }
 
     private var header: some View {
-        HStack {
-            Text("ツメショー").font(Theme.mono(13)).foregroundStyle(Theme.accent)
+        HStack(spacing: 8) {
+            Text("\(problem.id)問目").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.ink)
+            chip("\(problem.plies)手詰め", color: Theme.ink)
+            chip(problem.size == .small ? "5×5" : "9×9", color: Theme.soft)
             Spacer()
-            Text(String(format: "Q.%02d / %d", problem.id, total)).font(Theme.mono(13)).foregroundStyle(Theme.soft)
-            Text("\(problem.plies)手詰め")
-                .font(.system(size: 12, weight: .bold))
-                .padding(.horizontal, 10).padding(.vertical, 3)
-                .background(Capsule().fill(Theme.surface))
-                .foregroundStyle(Theme.ink)
+            // 最初の画面に戻る。盤の大きさを選び直すときはここから
+            Button(action: onExit) {
+                Label("トップ", systemImage: "house")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.ink)
+            .accessibilityHint("最初の画面に戻ります。盤の大きさを選び直せます")
         }
+    }
+
+    private func isRevealedDrop(_ kind: Kind) -> Bool {
+        guard let m = game.revealedAnswer else { return false }
+        return m.from == nil && m.kind == kind
+    }
+
+    private func chip(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .bold))
+            .padding(.horizontal, 10).padding(.vertical, 3)
+            .background(Capsule().fill(Theme.surface))
+            .foregroundStyle(color)
     }
 
     private var handRow: some View {
@@ -113,6 +130,10 @@ struct ProblemPage: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.hint, lineWidth: game.hintHandKinds.contains(item.kind) ? 3 : 0)
+                    )
+                    .overlay(
+                        // 間違えたときに見せる正解が、この持ち駒を打つ手のとき
+                        RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.ok, lineWidth: isRevealedDrop(item.kind) ? 3 : 0)
                     )
                     .overlay {
                         // 1 問目の案内：タップしてほしい持ち駒を点滅させる
@@ -151,7 +172,7 @@ struct ProblemPage: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("正解は \(answer)").font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.ink)
-                    Text("もう一度か、上にスワイプで次へ").font(.system(size: 13)).foregroundStyle(Theme.soft)
+                    Text("盤の緑の枠が正解の駒と行き先です。もう一度か、上にスワイプで次へ").font(.system(size: 13)).foregroundStyle(Theme.soft)
                 }
                 Spacer()
                 Button("もう一度") { game.reset() }
@@ -177,7 +198,7 @@ struct ProblemPage: View {
             Button {
                 game.reset()
             } label: {
-                Label("最初から", systemImage: "arrow.counterclockwise")
+                Label("盤面をリセット", systemImage: "arrow.counterclockwise")
             }
 
             Spacer()

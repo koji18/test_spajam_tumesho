@@ -331,6 +331,15 @@ enum Notation {
         return at + label(p) + (m.promote ? "成" : couldPromote ? "不成" : "")
     }
 
+    // 初心者向けの説明。例「３三の龍を４二へ」「２三の角を３二へ動かして成る」「持ち駒の金を５二に打つ」。
+    // 「４二龍」だけだと、同じ場所へ動ける駒が 2 枚あるときにどちらかわからないため
+    static func describe(_ m: Move, in pos: Position) -> String {
+        let at = fileLabel(Square.file(m.to)) + rankLabel(Square.rank(m.to))
+        guard let from = m.from, let p = pos.board[from] else { return "持ち駒の\(names[m.kind]!)を\(at)に打つ" }
+        let origin = fileLabel(Square.file(from)) + rankLabel(Square.rank(from))
+        return "\(origin)の\(label(p))を\(at)へ" + (m.promote ? "動かして成る" : "")
+    }
+
     // 手筋の名前。判定できるものだけ返す
     static func tesuji(_ m: Move, in pos: Position, captured: Bool) -> String? {
         if captured { return "捨て駒" }

@@ -6,7 +6,6 @@ func expect(_ ok: Bool, _ name: String) {
     if !ok { failures += 1 }
 }
 
-let inView: (Move) -> Bool = { Square.file($0.to) <= 5 && Square.rank($0.to) <= 5 }
 let at = Square.index
 
 print("ルール")
@@ -48,24 +47,61 @@ do {
     expect(!w.legalMoves().contains { $0.from == at(5, 2) && Square.file($0.to) != 5 }, "ピンされた金は筋から外れられない")
 }
 
-print("問題（\(problems.count) 問）")
-for q in problems {
+// 出題する問題の条件。固定の問題にも、アプリが裏で作る問題にも同じ条件をかける
+func check(_ q: Problem, _ name: String) {
     let p = q.position
-    let name = "Q\(q.id) \(q.plies)手詰め"
     expect(p.hands[.white]!.allSatisfy { $0 >= 0 }, "\(name)：駒の数が正しい")
     expect(!p.inCheck(.white), "\(name)：最初は王手になっていない")
-    let shown = p.mateMoves(plies: q.plies, where: inView)
-    let all = p.mateMoves(plies: q.plies)
-    expect(shown.count == 1 && all == shown, "\(name)：正解の初手は一つだけ（表示範囲の外にも別解がない）")
-    expect(shown.first.map { Notation.label($0, in: p) } == q.answer, "\(name)：正解は \(q.answer)")
+    let answers = p.mateMoves(plies: q.plies)
+    expect(answers.count == 1, "\(name)：正解の初手は一つだけ")
+    expect(answers.first.map { Notation.label($0, in: p) } == q.answer, "\(name)：正解は \(q.answer)")
+    let piecesInSmall = p.board.indices.allSatisfy { p.board[$0] == nil || p.isInSmallBoard($0) }
+    switch q.size {
+    case .small:
+        let inSmall: (Move) -> Bool = { p.isInSmallBoard($0.to) }
+        expect(piecesInSmall && p.mateMoves(plies: q.plies, where: inSmall) == answers, "\(name)：5×5 の範囲だけで同じ正解になる")
+    case .full where q.id != 1:  // 1 問目はどちらの盤でも同じチュートリアル用の例題
+        expect(!piecesInSmall, "\(name)：5×5 の範囲の外にも駒がある（盤の広さを使う）")
+    case .full:
+        break
+    }
     if q.plies == 3 {
         expect(!p.forcesMate(plies: 1), "\(name)：1手では詰まない（早詰めがない）")
-        let next = p.playing(shown[0])
-        if let reply = next.bestDefense(plies: 1, where: inView) {
-            expect(next.playing(reply).mateMoves(plies: 1, where: inView).count == 1, "\(name)：玉方の応手のあと、最終手も一つだけ")
+        let next = p.playing(answers[0])
+        if let reply = next.bestDefense(plies: 1) {
+            expect(next.playing(reply).mateMoves(plies: 1).count == 1, "\(name)：玉方の応手のあと、最終手も一つだけ")
         } else {
             expect(false, "\(name)：玉方に応手がある")
         }
+    }
+}
+
+do {
+    // ３二龍と３三龍のどちらも４二へ動ける局面。説明では、どちらの龍かがわかるようにする
+    let p = Position(problem: "4k4/6+R2/3s2+R2/9/9/9/9/9/9", attackerHand: "")
+    let m = Move(from: at(3, 3), to: at(4, 2), kind: .rook)
+    expect(Notation.describe(m, in: p) == "３三の龍を４二へ", "動かす駒の場所を説明に入れる")
+    expect(Notation.describe(Move(from: nil, to: at(5, 2), kind: .gold), in: p) == "持ち駒の金を５二に打つ", "打つ手の説明")
+}
+
+print("1 問目の例題")
+for size in BoardSize.allCases {
+    let q = Problem.tutorial(size)
+    check(q, "\(size) 1問目")
+    expect(ProblemGenerator.evaluate(q.position, size: .small, plies: 1)?.answer == q.answer, "\(size) 1問目：問題の条件を満たす")
+}
+
+print("アプリと同じ方法で作った問題")
+for size in BoardSize.allCases {
+    var generator = ProblemGenerator(seed: 7)
+    for (i, plies) in [1, 1, 1, 3, 3, 3].enumerated() {
+        let start = Date()
+        guard let q = generator.next(size: size, plies: plies, maxPieces: plies == 1 ? 6 : 7) else {
+            expect(false, "\(size) 生成\(i + 1)：\(plies)手詰めが作れる")
+            continue
+        }
+        let seconds = Date().timeIntervalSince(start)
+        check(q, String(format: "\(size) 生成\(i + 1) \(plies)手詰め（%.2f 秒）", seconds))
     }
 }
 

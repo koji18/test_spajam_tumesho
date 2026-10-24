@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// 1 問ぶんの遊びの状態。盤の表示は 1〜5 筋 × 一〜五段だけなので、攻め方の手もその中に限る。
+// 1 問ぶんの遊びの状態。5×5 の小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
 @MainActor @Observable
 final class Game {
     enum Selection: Equatable {
@@ -16,13 +16,10 @@ final class Game {
         case failed(answer: String)
     }
 
-    nonisolated static let files = 1...5
-    nonisolated static let ranks = 1...5
-    nonisolated static func isInView(_ m: Move) -> Bool {
-        files.contains(Square.file(m.to)) && ranks.contains(Square.rank(m.to))
-    }
-
     let problem: Problem
+    // 5×5 の盤で遊ぶ問題か。表示範囲は、3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
+    let smallBoard: Bool
+    let smallFiles: ClosedRange<Int>
     private(set) var position: Position
     private(set) var pliesLeft: Int
     private(set) var status: Status = .playing
@@ -31,19 +28,29 @@ final class Game {
     private(set) var targets: Set<Int> = []
     private(set) var lastMove: Move?
     private(set) var hintLevel = 0
+    // ヒントで光らせるマスと持ち駒。盤のマスごとに計算し直すと重いので、ヒントを押したときに一度だけ計算する
+    private(set) var hintSources: Set<Int> = []
+    private(set) var hintHandKinds: Set<Kind> = []
+    private(set) var hintTargets: Set<Int> = []
+    // 間違えたときに盤で見せる正解の手
+    private(set) var revealedAnswer: Move?
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
 
     init(problem: Problem) {
+        let start = problem.position
         self.problem = problem
-        position = problem.position
+        position = start
+        smallBoard = problem.size == .small
+        smallFiles = start.smallFiles
         pliesLeft = problem.plies
         message = Self.prompt(for: problem)
     }
 
+    // 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる
     private static func prompt(for problem: Problem) -> String {
-        problem.plies == 1 ? "王手をかけて、玉を詰ませよう" : "王手を2回かけて、玉を詰ませよう"
+        problem.id == 1 ? "王手をかけて、玉を詰ませよう" : ""
     }
 
     struct HandItem: Identifiable {
@@ -57,6 +64,18 @@ final class Game {
             let n = position.hands[.black]![k.rawValue]
             return n > 0 ? HandItem(kind: k, count: n) : nil
         }
+    }
+
+    // MARK: 盤の大きさ
+
+    var visibleFiles: ClosedRange<Int> { smallBoard ? smallFiles : 1...9 }
+    var visibleRanks: ClosedRange<Int> { smallBoard ? Position.smallRanks : 1...9 }
+
+    // 攻め方が指せる手を、見えているマスへの手に限る
+    private var filter: ((Move) -> Bool)? {
+        guard smallBoard else { return nil }
+        let files = smallFiles
+        return { files.contains(Square.file($0.to)) && Position.smallRanks.contains(Square.rank($0.to)) }
     }
 
     // MARK: 1 問目の案内
@@ -77,25 +96,30 @@ final class Game {
 
     // MARK: ヒント
 
-    // 1 回目：王手をかけられる駒を光らせる。2 回目：正解の行き先を光らせる
-    var hintSources: Set<Int> {
-        guard hintLevel >= 1 else { return [] }
-        return Set(position.checkMoves(where: Self.isInView).compactMap(\.from))
-    }
-
-    var hintHandKinds: Set<Kind> {
-        guard hintLevel >= 1 else { return [] }
-        return Set(position.checkMoves(where: Self.isInView).filter { $0.from == nil }.map(\.kind))
-    }
-
-    var hintTargets: Set<Int> {
-        guard hintLevel >= 2 else { return [] }
-        return Set(position.mateMoves(plies: pliesLeft, where: Self.isInView).map(\.to))
-    }
-
+    // 1 回目：王手をかけられる駒を光らせる。2 回目：正解の駒と行き先だけを光らせる
     func showHint() {
-        guard status == .playing else { return }
-        hintLevel = min(hintLevel + 1, 2)
+        guard status == .playing, hintLevel < 2 else { return }
+        hintLevel += 1
+        refreshHints()
+    }
+
+    private func refreshHints() {
+        switch hintLevel {
+        case 1:
+            let checks = position.checkMoves(where: filter)
+            hintSources = Set(checks.compactMap(\.from))
+            hintHandKinds = Set(checks.filter { $0.from == nil }.map(\.kind))
+            hintTargets = []
+        case 2:
+            let answers = position.mateMoves(plies: pliesLeft, where: filter)
+            hintSources = Set(answers.compactMap(\.from))
+            hintHandKinds = Set(answers.filter { $0.from == nil }.map(\.kind))
+            hintTargets = Set(answers.map(\.to))
+        default:
+            hintSources = []
+            hintHandKinds = []
+            hintTargets = []
+        }
     }
 
     // MARK: 操作
@@ -138,6 +162,8 @@ final class Game {
         targets = []
         lastMove = nil
         hintLevel = 0
+        refreshHints()
+        revealedAnswer = nil
         firstMoveCaptured = false
     }
 
@@ -149,7 +175,7 @@ final class Game {
     private func candidateMoves() -> [Move] {
         guard let selection else { return [] }
         return position.legalMoves().filter { m in
-            guard Self.isInView(m) else { return false }
+            guard filter?(m) ?? true else { return false }
             switch selection {
             case .square(let i): return m.from == i
             case .hand(let k): return m.from == nil && m.kind == k
@@ -165,16 +191,20 @@ final class Game {
             return
         }
         let before = position
-        let answers = before.mateMoves(plies: pliesLeft, where: Self.isInView)
-        position = before.playing(m)
-        lastMove = m
+        let answers = before.mateMoves(plies: pliesLeft, where: filter)
+        hintLevel = 0
+        refreshHints()
 
+        // 間違えたら指す前の盤に戻し、正解の駒と行き先を盤で見せる
         guard answers.contains(m) else {
-            let answer = answers.first.map { Notation.label($0, in: before) } ?? ""
+            revealedAnswer = answers.first
+            let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)
-            message = "残念、玉に逃げられます"
+            message = "残念、その手だと玉に逃げられます"
             return
         }
+        position = before.playing(m)
+        lastMove = m
         if position.isMate {
             let tesuji = firstMoveCaptured ? "捨て駒" : Notation.tesuji(m, in: before, captured: false)
             status = .solved(tesuji: tesuji)
@@ -183,12 +213,11 @@ final class Game {
         }
         // 3 手詰めの途中。玉方がいちばん粘る手で応じる
         pliesLeft -= 2
-        hintLevel = 0
         status = .thinking
         message = "玉方が考えています…"
         Task {
             try? await Task.sleep(for: .milliseconds(700))
-            guard let reply = position.bestDefense(plies: pliesLeft, where: Self.isInView) else { return }
+            guard let reply = position.bestDefense(plies: pliesLeft, where: filter) else { return }
             let replyLabel = Notation.label(reply, in: position)
             firstMoveCaptured = reply.to == m.to
             position = position.playing(reply)
@@ -199,9 +228,13 @@ final class Game {
     }
 }
 
-// 連続正解数。問題のページをまたいで共有する
+// 連続正解数と盤の大きさの設定。問題のページをまたいで共有する
 @MainActor @Observable
 final class Session {
+    // 盤の大きさ（true で 5×5）。次に起動したときも同じ大きさで始める
+    var smallBoard = UserDefaults.standard.bool(forKey: "smallBoard") {
+        didSet { UserDefaults.standard.set(smallBoard, forKey: "smallBoard") }
+    }
     private(set) var streak = 0
     private(set) var best = 0
     private(set) var solvedCount = 0
