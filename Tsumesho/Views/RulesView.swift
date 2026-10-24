@@ -337,7 +337,7 @@ private struct TapIllustration: View {
     }
 }
 
-// 四：ヒント。1回目は駒、2回目は行き先が光る
+// 四：ヒント。1回目は駒、2回目は行き先が光る。金は斜め前に 1 マス動いて頭金になる
 private struct HintIllustration: View {
     @State private var step = 0
 
@@ -353,7 +353,7 @@ private struct HintIllustration: View {
                 koma("歩", size: cellSize).position(board.center(2, 2))
                 koma("金", size: cellSize)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.hint, lineWidth: step == 1 ? 3 : 0).padding(2))
-                    .position(board.center(4, 3))
+                    .position(board.center(3, 2))
             }
             HStack(spacing: 10) {
                 Image(systemName: "lightbulb.fill")
