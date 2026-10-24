@@ -209,6 +209,8 @@ struct FeedView: View {
             try? await Task.sleep(for: .seconds(1.3))
             guard celebration?.id == c.id else { return }
             withAnimation(.easeOut(duration: 0.35)) { celebration = nil }
+            // 演出が消えたら、カードのスコアを数え上げる
+            await session.revealScore()
         }
     }
 
@@ -218,6 +220,7 @@ struct FeedView: View {
         if !session.tutorialCleared { session.tutorialCleared = true }
         slideToNext()
         withAnimation(.easeOut(duration: 0.3)) { celebration = nil }
+        Task { await session.revealScore() }
     }
 
     // 詰んだ問題の次へ。まだできていなければ作り置きを待つページへ。一度の演出で一度だけ進める

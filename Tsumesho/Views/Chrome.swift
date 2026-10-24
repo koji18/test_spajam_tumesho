@@ -187,6 +187,9 @@ struct RecordsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("スコア") {
+                    stat("累計スコア", "\(session.totalScore)")
+                }
                 Section("レーティング") {
                     stat("段位", session.rankName)
                     stat("レーティング", "\(session.rating)")

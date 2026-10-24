@@ -10,6 +10,41 @@ enum PlayMode: String {
     var title: String { self == .normal ? "NORMAL" : "TIME TRIAL" }
 }
 
+// 1 問を解いて得たスコアとその内訳
+struct ScoreGain {
+    let points: Int
+    let speedBonus: Int
+    let sizeMultiplier: Double
+    let streakMultiplier: Double
+
+    // 基本点（1 手詰め 100・3 手詰め 300）に盤のサイズの倍率をかけ、スピードボーナスを足す。
+    // ヒント 1 段ごとに 25% 減らし（最低 25%）、最後に連勝の倍率をかける
+    static func make(plies: Int, size: BoardSize, seconds: Int, hintsUsed: Int, streak: Int) -> ScoreGain {
+        let base = Double(plies == 1 ? 100 : 300)
+        let sizeMultiplier = switch size {
+        case .small: 1.0
+        case .medium: 1.2
+        case .full: 1.5
+        }
+        // 1 手詰めは 15 秒、3 手詰めは 40 秒より速いほど増える。最大で基本点の半分
+        let par = plies == 1 ? 15.0 : 40.0
+        let speedBonus = Int(base * 0.5 * max(0, 1 - Double(seconds) / par))
+        let hintFactor = max(0.25, 1 - 0.25 * Double(hintsUsed))
+        let streakMultiplier = streakMultiplier(for: streak)
+        let points = Int(((base * sizeMultiplier + Double(speedBonus)) * hintFactor * streakMultiplier).rounded())
+        return ScoreGain(points: points, speedBonus: speedBonus, sizeMultiplier: sizeMultiplier, streakMultiplier: streakMultiplier)
+    }
+
+    // 連勝の倍率。2 連勝目から 0.1 ずつ上がり、最大 3 倍
+    static func streakMultiplier(for streak: Int) -> Double {
+        min(3, 1 + 0.1 * Double(max(0, streak - 1)))
+    }
+
+    static func format(_ multiplier: Double) -> String {
+        String(format: "x%.1f", multiplier)
+    }
+}
+
 // 遊び方の設定と成績。問題のページをまたいで共有し、次に起動したときも残す
 @MainActor @Observable
 final class Session {
@@ -28,6 +63,11 @@ final class Session {
     private(set) var bestStreak: Int { didSet { store.set(bestStreak, forKey: "bestStreak") } }
     private(set) var solvedTotal: Int { didSet { store.set(solvedTotal, forKey: "solvedTotal") } }
     private(set) var timeTrialBest: Int { didSet { store.set(timeTrialBest, forKey: "timeTrialBest") } }
+    private(set) var totalScore: Int { didSet { store.set(totalScore, forKey: "totalScore") } }
+    // カードに出しているスコア。解いた直後は前の値のままにしておき、演出が消えてから数え上げる
+    private(set) var displayedScore: Int
+    // 数え上げている間だけ、カードの横に「+735」と出す
+    private(set) var scorePopup: Int?
 
     init() {
         mode = PlayMode(rawValue: store.string(forKey: "mode") ?? "") ?? .normal
@@ -39,21 +79,48 @@ final class Session {
         bestStreak = store.integer(forKey: "bestStreak")
         solvedTotal = store.integer(forKey: "solvedTotal")
         timeTrialBest = store.integer(forKey: "timeTrialBest")
+        let score = store.integer(forKey: "totalScore")
+        totalScore = score
+        displayedScore = score
     }
 
-    // 正解なら 1 手詰めで +12、3 手詰めで +20。ヒントを 1 段使うごとに 5 減らす（最低 +2）。
-    // 間違えたら -10。0 より下にはしない
-    func record(solved: Bool, plies: Int, hintsUsed: Int) {
-        if solved {
-            streak += 1
-            solvedTotal += 1
-            bestStreak = max(bestStreak, streak)
-            rating += max(2, (plies == 1 ? 12 : 20) - hintsUsed * 5)
-        } else {
-            streak = 0
-            rating = max(0, rating - 10)
-        }
+    // 正解：レーティングは 1 手詰めで +12、3 手詰めで +20。ヒントを 1 段使うごとに 5 減らす（最低 +2）。
+    //       スコアは ScoreGain の計算で累計に足し、得た点を返す。
+    // 間違い：レーティングは -10（0 より下にはしない）。連勝は 0 に戻る
+    @discardableResult
+    func recordSolve(plies: Int, size: BoardSize, seconds: Int, hintsUsed: Int) -> ScoreGain {
+        streak += 1
+        solvedTotal += 1
+        bestStreak = max(bestStreak, streak)
+        rating += max(2, (plies == 1 ? 12 : 20) - hintsUsed * 5)
+        let gain = ScoreGain.make(plies: plies, size: size, seconds: seconds, hintsUsed: hintsUsed, streak: streak)
+        totalScore += gain.points
+        return gain
     }
+
+    // カードのスコアを、今の表示から累計まで約 0.8 秒で数え上げる
+    func revealScore() async {
+        let from = displayedScore
+        let to = totalScore
+        guard to > from else { return }
+        scorePopup = to - from
+        let steps = 24
+        for i in 1...steps {
+            displayedScore = from + (to - from) * i / steps
+            try? await Task.sleep(for: .milliseconds(33))
+        }
+        displayedScore = totalScore
+        try? await Task.sleep(for: .milliseconds(600))
+        scorePopup = nil
+    }
+
+    func recordMiss() {
+        streak = 0
+        rating = max(0, rating - 10)
+    }
+
+    // 次に解いたときにかかる連勝の倍率
+    var nextStreakMultiplier: Double { ScoreGain.streakMultiplier(for: streak + 1) }
 
     func recordTimeTrial(solved: Int) {
         timeTrialBest = max(timeTrialBest, solved)

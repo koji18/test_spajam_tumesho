@@ -43,11 +43,13 @@ struct ProblemPage: View {
         .onChange(of: game.status) { _, status in
             switch status {
             case .solved(let tesuji):
-                session.record(solved: true, plies: problem.plies, hintsUsed: game.hintsUsed)
+                // スコアは裏で累計に足し、演出が消えてからカードで数え上げる
+                session.recordSolve(plies: problem.plies, size: problem.size,
+                                    seconds: game.solvedSeconds, hintsUsed: game.hintsUsed)
                 // 詰み演出と振動は、問題の列の上のレイヤーで出す（FeedView）
                 onSolved(game.solvedSeconds, tesuji)
             case .failed:
-                session.record(solved: false, plies: problem.plies, hintsUsed: game.hintsUsed)
+                session.recordMiss()
             default:
                 break
             }
@@ -274,24 +276,52 @@ struct RatingCard: View {
                 .shadow(color: Theme.neonCyan.opacity(0.6 * palette.glow), radius: 8)
             VStack(alignment: .leading, spacing: 0) {
                 Text("RATING").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
-                Text("\(session.rating)")
-                    .font(Theme.display(30, weight: .black))
+                Text(verbatim: "\(session.rating)")
+                    .font(Theme.number(30, weight: .black))
                     .foregroundStyle(palette.rating)
                     .shadow(color: Theme.neonCyan.opacity(0.8 * palette.glow), radius: 8)
                     .contentTransition(.numericText())
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 8) {
-                Text("\(session.streak) 連勝中")
-                    .font(.system(size: 15, weight: .bold))
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("SCORE").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
+                Text(verbatim: "\(session.displayedScore)")
+                    .font(Theme.number(22, weight: .black))
                     .foregroundStyle(palette.accent)
-                    .contentTransition(.numericText())
-                HStack(spacing: 4) {
-                    ForEach(0..<5, id: \.self) { i in
-                        Capsule()
-                            .fill(i < filled ? palette.accent : palette.text.opacity(0.15))
-                            .frame(width: 22, height: 6)
+                    .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 6)
+                    .overlay(alignment: .topLeading) {
+                        // 数え上げている間だけ、得た点を浮かべる
+                        if let popup = session.scorePopup {
+                            Text(verbatim: "+\(popup)")
+                                .font(Theme.number(15, weight: .heavy))
+                                .foregroundStyle(palette.accent)
+                                .shadow(color: Theme.goldGlow.opacity(palette.glow), radius: 8)
+                                .fixedSize()
+                                .offset(x: -8, y: -20)
+                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity),
+                                                        removal: .move(edge: .top).combined(with: .opacity)))
+                        }
                     }
+                    .animation(.spring(duration: 0.4), value: session.scorePopup)
+                HStack(spacing: 6) {
+                    Text("\(session.streak)連勝")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(palette.accent)
+                        .lineLimit(1)
+                        .fixedSize()
+                    HStack(spacing: 3) {
+                        ForEach(0..<5, id: \.self) { i in
+                            Capsule()
+                                .fill(i < filled ? palette.accent : palette.text.opacity(0.15))
+                                .frame(width: 10, height: 5)
+                        }
+                    }
+                    // 次に解いたときにかかる連勝の倍率
+                    Text(ScoreGain.format(session.nextStreakMultiplier))
+                        .font(Theme.number(11))
+                        .foregroundStyle(palette.accent)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
             }
         }
@@ -300,7 +330,7 @@ struct RatingCard: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(palette.panelStroke, lineWidth: 1))
         .animation(.spring, value: session.rating)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(session.rankName)、レーティング\(session.rating)、\(session.streak)連勝中")
+        .accessibilityLabel("\(session.rankName)、レーティング\(session.rating)、スコア\(session.totalScore)、\(session.streak)連勝中")
     }
 }
 
