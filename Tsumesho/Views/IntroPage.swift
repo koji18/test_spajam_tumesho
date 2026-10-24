@@ -46,11 +46,11 @@ struct IntroPage: View {
         HStack(alignment: .top) {
             plaque
             Spacer()
-            Button("遊び方") { showsRules = true }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Washi.inkSoft)
-                .underline()
-                .padding(.top, 6)
+            Button { showsRules = true } label: {
+                FudaTag(text: "遊び方", selected: false, fontSize: 13)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("遊び方")
         }
     }
 
@@ -162,7 +162,7 @@ struct IntroPage: View {
     }
 
     private var caption: some View {
-        Text("飛を左上へ。玉の逃げ道がなくなれば「詰み」。\n盤をタップで、もう一度。")
+        Text("飛を左上へ。玉の逃げ道がなくなれば「詰み」。\n盤をタップすると、実演が見られます。")
             .font(.system(size: 12))
             .foregroundStyle(Washi.inkSoft)
             .multilineTextAlignment(.leading)
@@ -234,25 +234,16 @@ struct IntroPage: View {
         }
     }
 
-    // 小さな木札。選んでいるものは朱で縁取って少し沈める
+    // 木札のメニュー。選んでいる札は浮いて、朱の文字になる
     private func tab(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button {
             if session.hapticsOn { UISelectionFeedbackGenerator().selectionChanged() }
-            withAnimation(.easeOut(duration: 0.12)) { action() }
+            action()
         } label: {
-            Text(text)
-                .font(Theme.koma(15))
-                .foregroundStyle(selected ? Washi.vermilion : Washi.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 3).fill(selected ? Washi.kaya : Washi.paperDark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(selected ? Washi.vermilion : Washi.kayaEdge.opacity(0.5), lineWidth: selected ? 2 : 1)
-                )
-                .offset(y: selected ? 2 : 0)
+            FudaTag(text: text, selected: selected)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(text)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

@@ -59,7 +59,7 @@ struct TutorialView: View {
                               previousStars: session.tutorialStars[i],
                               nextLabel: nextLabel(after: i),
                               onSolved: { earned in session.recordTutorial(stage: i, stars: earned) },
-                              onNext: { goNext(from: i) })
+                              onNext: { auto in goNext(from: i, auto: auto) })
                         .containerRelativeFrame([.horizontal, .vertical])
                         .id(i)
                 }
@@ -127,7 +127,9 @@ struct TutorialView: View {
         return session.tutorialDone ? "修了へ" : "解いていない段へ"
     }
 
-    private func goNext(from i: Int) {
+    // 解いた演出のあとの自動送りは、まだその段を見ているときだけ進める（途中で別の段へ動かしていたら進めない）
+    private func goNext(from i: Int, auto: Bool) {
+        if auto && index != i { return }
         if i + 1 < stages.count {
             withAnimation(.easeInOut(duration: 0.45)) { current = i + 1 }
         } else if session.tutorialDone {
@@ -151,7 +153,7 @@ private struct StagePage: View {
     let previousStars: Int
     let nextLabel: String
     let onSolved: (_ stars: Int) -> Void
-    let onNext: () -> Void
+    let onNext: (_ auto: Bool) -> Void
 
     @Environment(Session.self) private var session
     @State private var game: Game
@@ -163,9 +165,10 @@ private struct StagePage: View {
     @State private var sealScale: CGFloat = 2.4
     @State private var sealOpacity = 0.0
     @State private var bump: CGFloat = 0
+    @State private var advanceTask: Task<Void, Never>?
 
     init(stage: TutorialStage, total: Int, previousStars: Int, nextLabel: String,
-         onSolved: @escaping (_ stars: Int) -> Void, onNext: @escaping () -> Void) {
+         onSolved: @escaping (_ stars: Int) -> Void, onNext: @escaping (_ auto: Bool) -> Void) {
         self.stage = stage
         self.total = total
         self.previousStars = previousStars
@@ -220,6 +223,13 @@ private struct StagePage: View {
         withAnimation(.spring(response: 0.25, dampingFraction: 0.5).delay(0.15)) { stampScale = 1 }
         onSolved(earnedStars)
         celebrate()
+        // 演出を見せてから、自動で次の段へ進む
+        advanceTask?.cancel()
+        advanceTask = Task {
+            try? await Task.sleep(for: .milliseconds(2300))
+            guard !Task.isCancelled else { return }
+            onNext(true)
+        }
     }
 
     // 解けた瞬間の、少しだけ派手な演出。盤の上に朱の落款が押され、紙吹雪が舞う
@@ -272,6 +282,7 @@ private struct StagePage: View {
 
     // もう一度、はじめから解く。前に解いた星は残る
     private func retry() {
+        advanceTask?.cancel()
         game = Game(problem: stage.problem)
         game.start()
         burstStart = nil
@@ -453,7 +464,8 @@ private struct StagePage: View {
             VStack(spacing: 8) {
                 Button {
                     if session.hapticsOn { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-                    onNext()
+                    advanceTask?.cancel()
+                    onNext(false)
                 } label: {
                     Text(nextLabel)
                         .font(.system(size: 18, weight: .heavy))

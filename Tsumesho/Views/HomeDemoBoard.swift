@@ -15,7 +15,7 @@ enum Washi {
 
 // ホーム画面の真ん中に置く、詰みの実演。木の盤の上で、飛車が左上に滑り込んで玉が詰み、
 // 朱の落款「詰」が押される。玉(右上)は、横の逃げ道を飛車に、下の逃げ道を金に押さえられている。
-// タップするともう一度流す
+// 自動では動かさず、盤をタップしたときだけ流す
 struct HomeDemoBoard: View {
     @Environment(Session.self) private var session
 
@@ -56,7 +56,7 @@ struct HomeDemoBoard: View {
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { pulse = true }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("詰みの実演。飛車を左上に動かすと、玉が逃げられなくなります。タップでもう一度見られます")
+        .accessibilityLabel("詰みの実演。飛車を左上に動かすと、玉が逃げられなくなります。タップすると実演が見られます")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -184,44 +184,39 @@ struct HomeDemoBoard: View {
         token += 1
     }
 
-    // 待つ → 飛車が滑る → 落款がドンと押される → 余韻、をくり返す。タップで token が変わると最初からやり直す
+    // 盤をタップしたときだけ、飛車が滑る → 落款がドンと押される、を一度流して、最初の形に戻す。
+    // タップしていないときは、最初の形のまま動かさない（token が 0 のあいだ）
     private func loop() async {
-        let userTriggered = token > 0
-        var first = true
-        while !Task.isCancelled {
-            moved = false
-            mate = false
-            mateStart = nil
-            verdict = false
-            stampOpacity = 0
-            stampScale = 2.4
-            try? await Task.sleep(for: .milliseconds(1500))
-            if Task.isCancelled { return }
-            withAnimation(.easeIn(duration: 0.28)) { moved = true }
-            try? await Task.sleep(for: .milliseconds(320))
-            if Task.isCancelled { return }
-            mate = true
-            mateStart = Date()
-            stampOpacity = 1
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.5)) { stampScale = 1 }
-            if session.hapticsOn {
-                if userTriggered {
-                    Haptics.mate(enabled: true)
-                } else if !first {
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                }
-            }
-            Task {
-                try? await Task.sleep(for: .milliseconds(380))
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { verdict = true }
-            }
-            await thud()
-            first = false
-            try? await Task.sleep(for: .milliseconds(2500))
-            if Task.isCancelled { return }
-            withAnimation(.easeIn(duration: 0.3)) { stampOpacity = 0; verdict = false }
-            try? await Task.sleep(for: .milliseconds(350))
+        moved = false
+        mate = false
+        mateStart = nil
+        verdict = false
+        stampOpacity = 0
+        stampScale = 2.4
+        guard token > 0 else { return }
+
+        try? await Task.sleep(for: .milliseconds(350))
+        if Task.isCancelled { return }
+        withAnimation(.easeIn(duration: 0.28)) { moved = true }
+        try? await Task.sleep(for: .milliseconds(320))
+        if Task.isCancelled { return }
+        mate = true
+        mateStart = Date()
+        stampOpacity = 1
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.5)) { stampScale = 1 }
+        if session.hapticsOn { Haptics.mate(enabled: true) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(380))
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { verdict = true }
         }
+        await thud()
+        try? await Task.sleep(for: .milliseconds(2500))
+        if Task.isCancelled { return }
+        withAnimation(.easeIn(duration: 0.3)) { stampOpacity = 0; verdict = false }
+        try? await Task.sleep(for: .milliseconds(350))
+        if Task.isCancelled { return }
+        withAnimation(.easeOut(duration: 0.25)) { moved = false; mate = false }
+        mateStart = nil
     }
 
     // 落款が押された衝撃で、盤が沈んで戻る
