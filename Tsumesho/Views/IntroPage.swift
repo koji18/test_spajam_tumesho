@@ -162,7 +162,7 @@ struct IntroPage: View {
     }
 
     private var caption: some View {
-        Text("飛を左上へ。玉の逃げ道がなくなれば「詰み」。\n盤をタップすると、実演が見られます。")
+        Text("飛を左上へ。玉の逃げ道がなくなれば「詰み」。\n盤をタップすると、すぐ見られます。")
             .font(.system(size: 12))
             .foregroundStyle(Washi.inkSoft)
             .multilineTextAlignment(.leading)
