@@ -3,3 +3,7 @@ build/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 DerivedData/
+# project.yml から xcodegen generate で作るので、git に入れない
+Tsumesho.xcodeproj/
+# 人ごとのビルド設定
+Config/Local.xcconfig

@@ -1,0 +1,9 @@
+// このファイルを Local.xcconfig という名前でコピーして、自分の値を書く。
+//   cp Config/Local.xcconfig.example Config/Local.xcconfig
+// Local.xcconfig は git に入れない（.gitignore 済み）。
+
+// 自分の Team ID。Xcode で Personal Team を選んだあと、Build Settings の「Development Team」で確認できる
+DEVELOPMENT_TEAM = XXXXXXXXXX
+
+// 「Bundle ID がすでに使われています」と出たら、自分用の ID に変える
+// PRODUCT_BUNDLE_IDENTIFIER = com.自分の名前.tsumesho
