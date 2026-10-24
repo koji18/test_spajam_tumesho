@@ -12,6 +12,7 @@ struct PracticeLibraryTests {
         let library = PracticeLibrary(store: store)
         library.recordMistake(problem, mode: .timeTrial)
         library.recordMistake(problem, mode: .tutorial)
+        library.recordMistake(problem, mode: .zen)
         #expect(library.entries.isEmpty)
         library.recordMistake(problem, mode: .normal)
         #expect(library.entries.count == 1)

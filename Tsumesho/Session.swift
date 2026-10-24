@@ -5,12 +5,14 @@ enum PlayMode: String {
     case tutorial
     case normal
     case timeTrial
+    case zen      // 修行。ノーマルで間違えた問題を解き直す
 
     var title: String {
         switch self {
         case .tutorial: "TUTORIAL"
         case .normal: "NORMAL"
         case .timeTrial: "TIME TRIAL"
+        case .zen: "ZEN"
         }
     }
 
@@ -20,6 +22,7 @@ enum PlayMode: String {
         case .tutorial: "チュートリアル"
         case .normal: "ノーマル"
         case .timeTrial: "タイムトライアル"
+        case .zen: "修行"
         }
     }
 }

@@ -69,6 +69,8 @@ struct ModeIcon: View {
             }
         case .timeTrial:
             Image(systemName: "stopwatch").font(.system(size: size))
+        case .zen:
+            Image(systemName: "leaf").font(.system(size: size))
         }
     }
 }
@@ -88,6 +90,7 @@ struct MenuPanel: View {
             row(title: "チュートリアル", selected: session.mode == .tutorial, action: { onMode(.tutorial) }) { ModeIcon(mode: .tutorial, size: 20) }
             row(title: "ノーマル", selected: session.mode == .normal, action: { onMode(.normal) }) { ModeIcon(mode: .normal, size: 20) }
             row(title: "タイムトライアル", selected: session.mode == .timeTrial, action: { onMode(.timeTrial) }) { ModeIcon(mode: .timeTrial, size: 20) }
+            row(title: "修行", selected: session.mode == .zen, action: { onMode(.zen) }) { ModeIcon(mode: .zen, size: 20) }
             row(title: "記録", selected: false, action: onRecords) { Image(systemName: "chart.bar") }
             row(title: "設定", selected: false, action: onSettings) { Image(systemName: "gearshape") }
 
