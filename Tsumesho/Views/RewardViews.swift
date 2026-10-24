@@ -153,7 +153,7 @@ struct FeedbackPreviewView: View {
         let item = SolveReward(gain: gain, streak: streak, previousRank: "初", rank: rankUp ? "二" : "初")
         reward = item
         Haptics.play(rankUp ? .rankUp : .mate(streak), enabled: session.hapticsOn)
-        if !rankUp { Sound.playMate(volume: session.soundVolume) }
+        if !rankUp { Sound.playMate(volume: session.soundVolume, streak: streak) }
         previewTask = Task { @MainActor in
             do {
                 try await Task.sleep(for: .seconds(rankUp ? 1.8 : 1.6))

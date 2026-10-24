@@ -206,7 +206,7 @@ struct FeedView: View {
                 try await Task.sleep(for: .milliseconds(reduceMotion ? 120 : 620))
                 settling = false
                 Haptics.play(.mate(reward.streak), enabled: session.hapticsOn)
-                Sound.playMate(volume: session.soundVolume)
+                Sound.playMate(volume: session.soundVolume, streak: reward.streak)
                 withAnimation(.easeOut(duration: 0.15)) { celebration = c }
                 try await Task.sleep(for: .seconds(0.9))
                 guard celebration?.id == c.id else { return }

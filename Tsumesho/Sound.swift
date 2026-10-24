@@ -9,7 +9,7 @@ enum Sound {
     /// 起動時に一度呼ぶ。ゲームの効果音として扱い、マナーモードのときは鳴らさず、音楽などは止めずに重ねて鳴らす
     static func prepare() {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        matePlayer = load("mate")
+        matePlayer = load("mate", changesPitch: true)
         pickPlayer = load("pick")
     }
 
@@ -19,16 +19,28 @@ enum Sound {
         pickPlayer?.stop()
     }
 
-    /// Sounds/ に入れた wav を読み込んで、すぐ鳴らせるようにしておく
-    private static func load(_ name: String) -> AVAudioPlayer? {
+    /// Sounds/ に入れた wav を読み込んで、すぐ鳴らせるようにしておく。changesPitch なら、鳴らす速さ（音の高さ）を変えられるようにする
+    private static func load(_ name: String, changesPitch: Bool = false) -> AVAudioPlayer? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "wav"),
               let player = try? AVAudioPlayer(contentsOf: url) else { return nil }
+        player.enableRate = changesPitch
         player.prepareToPlay()
         return player
     }
 
-    /// 詰んだときの音を volume（0〜1）で鳴らす
-    static func playMate(volume: Double) {
+    /// 詰みの音を上げる上限（半音いくつ分か）。9 連勝で頭打ちになる
+    static let maxMateSemitones = 8
+
+    /// 連勝 streak のときの詰みの音の速さ。1 連勝は元の高さで、連勝が 1 つ増えるごとに半音ずつ上げる。
+    /// 速く鳴らして高くするので、高いほど音は少し短くなる
+    static func mateRate(streak: Int) -> Float {
+        let semitones = min(max(streak - 1, 0), maxMateSemitones)
+        return Float(pow(2, Double(semitones) / 12))
+    }
+
+    /// 詰んだときの音を volume（0〜1）で鳴らす。連勝 streak が続くほど高くする
+    static func playMate(volume: Double, streak: Int) {
+        matePlayer?.rate = mateRate(streak: streak)
         play(matePlayer, volume: volume)
     }
 
