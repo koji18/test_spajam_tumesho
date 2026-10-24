@@ -15,25 +15,41 @@ struct PieceGuideSheet: View {
         VStack(spacing: 0) {
             header
             selector
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    titleRow
-                    PieceMoveBoard(kind: kind, promoted: promoted)
-                        .frame(maxWidth: .infinity)
-                        .id("\(kind.rawValue)-\(promoted)")
-                    legend
-                    infoCard
+            // 駒ごとのページ。左右にスワイプしても、上の駒を押しても切り替わる
+            TabView(selection: $kind) {
+                ForEach(Self.order, id: \.self) { k in
+                    page(k).tag(k)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 14)
-                .padding(.bottom, 24)
             }
-            .scrollIndicators(.hidden)
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .background(PaperBackground())
         .environment(\.palette, .classic)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .onChange(of: kind) { _, _ in
+            promoted = false
+            if session.hapticsOn { UISelectionFeedbackGenerator().selectionChanged() }
+        }
+    }
+
+    // 1 つの駒のページ。縦に長いときだけ、上下にスクロールする
+    private func page(_ k: Kind) -> some View {
+        let isPromoted = promoted && k.canPromote
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                titleRow(k, isPromoted)
+                PieceMoveBoard(kind: k, promoted: isPromoted)
+                    .frame(maxWidth: .infinity)
+                    .id("\(k.rawValue)-\(isPromoted)")
+                legend
+                infoCard(k, isPromoted)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 14)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
     }
 
     // MARK: 上の段
@@ -61,11 +77,7 @@ struct PieceGuideSheet: View {
         HStack(spacing: 2) {
             ForEach(Self.order, id: \.self) { k in
                 Button {
-                    if session.hapticsOn { UISelectionFeedbackGenerator().selectionChanged() }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        kind = k
-                        if !k.canPromote { promoted = false }
-                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { kind = k }
                 } label: {
                     KomaView(label: Notation.label(k), size: 38)
                         .environment(\.palette, .classic)
@@ -87,7 +99,7 @@ struct PieceGuideSheet: View {
 
     // MARK: 見出し
 
-    private var titleRow: some View {
+    private func titleRow(_ kind: Kind, _ promoted: Bool) -> some View {
         HStack(alignment: .center, spacing: 12) {
             KomaView(label: Notation.label(Piece(side: .black, kind: kind, promoted: promoted)),
                      promoted: promoted, size: 54)
@@ -100,26 +112,26 @@ struct PieceGuideSheet: View {
                     .font(.system(size: 12)).foregroundStyle(Washi.inkSoft)
             }
             Spacer()
-            if kind.canPromote { promoteSwitch }
+            if kind.canPromote { promoteSwitch(promoted) }
         }
     }
 
     // 「成る」の切り替え。成ったあとの駒の動きを見られる
-    private var promoteSwitch: some View {
+    private func promoteSwitch(_ isPromoted: Bool) -> some View {
         Button {
             if session.hapticsOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { promoted.toggle() }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: promoted ? "arrow.uturn.backward" : "arrow.up.circle.fill")
-                Text(promoted ? "元に戻す" : "成る")
+                Image(systemName: isPromoted ? "arrow.uturn.backward" : "arrow.up.circle.fill")
+                Text(isPromoted ? "元に戻す" : "成る")
             }
             .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(promoted ? Washi.vermilion : Washi.paper)
+            .foregroundStyle(isPromoted ? Washi.vermilion : Washi.paper)
             .padding(.horizontal, 14)
             .frame(minHeight: 40)
-            .background(RoundedRectangle(cornerRadius: 4).fill(promoted ? Color.clear : Washi.vermilion))
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: promoted ? 1.5 : 0))
+            .background(RoundedRectangle(cornerRadius: 4).fill(isPromoted ? Color.clear : Washi.vermilion))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Washi.vermilion, lineWidth: isPromoted ? 1.5 : 0))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -136,7 +148,7 @@ struct PieceGuideSheet: View {
 
     // MARK: 説明
 
-    private var infoCard: some View {
+    private func infoCard(_ kind: Kind, _ promoted: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             let info = promoted ? Self.promotedInfo(kind) : Self.info(kind)
             section("動き方", info.move)
