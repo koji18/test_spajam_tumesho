@@ -132,6 +132,18 @@ struct GameTests {
         #expect(game.mistakes == 0)
     }
 
+    @Test func ノーマルの1問目だけ案内を出し_入門の1段目には出さない() throws {
+        let normal = Game(problem: tutorial)
+        #expect(normal.guide != nil)
+        #expect(normal.guideHandKind == .gold)
+
+        let firstStage = try #require(TutorialStage.all.first)
+        let lesson = Game(problem: firstStage.problem)
+        #expect(lesson.problem.id == 1)  // 入門の問題も番号は 1 から
+        #expect(lesson.guide == nil)
+        #expect(lesson.guideHandKind == nil)
+    }
+
     @Test func ヒントは2段まで_2段目で正解の行き先が光る() {
         let game = Game(problem: tutorial)
         game.showHint()

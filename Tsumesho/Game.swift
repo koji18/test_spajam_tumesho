@@ -65,7 +65,7 @@ final class Game {
     /// 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる。
     /// 入門の問題は、説明を画面の上のカードに出すので、ここは空にしておく
     private static func prompt(for problem: Problem) -> String {
-        problem.id == 1 && problem.lesson == nil ? "王手をかけて、玉を詰ませよう" : ""
+        isFirstNormalProblem(problem) ? "王手をかけて、玉を詰ませよう" : ""
     }
 
     struct HandItem: Identifiable {
@@ -111,7 +111,13 @@ final class Game {
 
     var guideHandKind: Kind? { isGuiding && selection == nil ? .gold : nil }
 
-    private var isGuiding: Bool { problem.id == 1 && status == .playing && lastMove == nil }
+    private var isGuiding: Bool { Self.isFirstNormalProblem(problem) && status == .playing && lastMove == nil }
+
+    /// ノーマルの 1 問目（頭金の例題）か。入門の問題も id が 1〜7 なので、番号だけでなく入門の問題でないことも確かめる。
+    /// 上の一文・案内・金の点滅の枠は、この問題だけに出す
+    static func isFirstNormalProblem(_ problem: Problem) -> Bool {
+        problem.id == 1 && problem.lesson == nil
+    }
 
     // MARK: ヒント
 
