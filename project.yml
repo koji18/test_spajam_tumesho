@@ -24,3 +24,23 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets:
+        - TsumeshoTests
+  # 単体テスト（Swift Testing）。xcodebuild test か Xcode の ⌘U で動かす
+  TsumeshoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - TsumeshoTests
+    dependencies:
+      - target: Tsumesho
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(inherited).tests
+        CODE_SIGN_STYLE: Automatic

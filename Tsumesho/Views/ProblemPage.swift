@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 縦スワイプの 1 ページ。1 問ぶん。上のバー（モードとメニュー）は FeedView が画面の上に固定して出す
+/// 縦スワイプの 1 ページ。1 問ぶん。上のバー（モードとメニュー）は FeedView が画面の上に固定して出す
 struct ProblemPage: View {
     let problem: Problem
     let insets: EdgeInsets
@@ -8,8 +8,11 @@ struct ProblemPage: View {
     @Environment(Session.self) private var session
     @Environment(TimeTrial.self) private var trial
     @Environment(\.palette) private var palette
+    @Environment(\.pageLayout) private var layout
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var game: Game
 
+    /// 詰んだら解答時間・手筋・獲得点の内訳を渡す。
     init(problem: Problem, insets: EdgeInsets, onSolved: @escaping (_ seconds: Int, _ tesuji: String?, _ reward: SolveReward) -> Void) {
         self.problem = problem
         self.insets = insets
@@ -18,21 +21,27 @@ struct ProblemPage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: layout.spacing) {
             modeRow
             titleRow
+            // 盤は残った高さに収まる大きさになるので、盤より下の部品は高さを変えない
             BoardView(game: game)
             statusLine
             handRow
-            if case .failed(let answer) = game.status {
-                failCard(answer)
-            }
             Spacer(minLength: 0)
-            RatingCard(problemKey: problem.key)
+            // 間違えたときは、レーティングのカードの場所に正解のカードを出す
+            Group {
+                if case .failed(let answer) = game.status {
+                    failCard(answer)
+                } else {
+                    RatingCard(problemKey: problem.key)
+                }
+            }
+            .frame(height: layout.cardHeight)
             controls
         }
         .padding(.horizontal, 20)
-        .padding(.top, insets.top + TopBar.height + 8)
+        .padding(.top, insets.top + layout.topBarHeight + (layout.compact ? 4 : 8))
         .padding(.bottom, insets.bottom + 6)
         .background(NeonBackdrop())
         .confirmationDialog("成りますか？", isPresented: promotionBinding, titleVisibility: .visible) {
@@ -61,10 +70,11 @@ struct ProblemPage: View {
         .sensoryFeedback(trigger: game.selection) { _, selection in
             session.hapticsOn && selection != nil ? .selection : nil
         }
-        .sensoryFeedback(trigger: game.status) { _, status in
-            guard session.hapticsOn, case .failed = status else { return nil }
-            return .error
+        .onChange(of: game.selection) { _, selection in
+            if selection != nil { Sound.playPick(volume: session.soundVolume) }
         }
+        // 間違えたとき（王手でない手も含む）。盤の揺れに合わせて鳴らす
+        .sensoryFeedback(trigger: game.mistakes) { _, _ in session.hapticsOn ? .error : nil }
         .animation(.spring(duration: 0.35), value: game.status)
     }
 
@@ -91,7 +101,7 @@ struct ProblemPage: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("\(Theme.kanjiNumber(problem.plies))手詰")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: layout.title, weight: .heavy))
                     .foregroundStyle(palette.text)
                 Text("第\(problem.id)問 ・ 攻め方 先手")
                     .font(.system(size: 14, weight: .semibold))
@@ -102,11 +112,11 @@ struct ProblemPage: View {
                 if trial.isRunning {
                     TimelineView(.periodic(from: .now, by: 0.5)) { context in
                         let left = trial.remaining(at: context.date)
-                        // 残り 10 秒を切ったら赤く点滅させる
+                        /// 残り 10 秒を切ったら赤く点滅させる
                         let urgent = left < 10
                         let blinkOff = urgent && Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
                         Text(TimeTrial.format(left))
-                            .font(Theme.number(30, weight: .black))
+                            .font(Theme.number(layout.counter, weight: .black))
                             .monospacedDigit()
                             .foregroundStyle(urgent ? Color.red : palette.counter)
                             .shadow(color: (urgent ? Color.red : Theme.neonPink).opacity(0.8 * palette.glow), radius: 8)
@@ -132,7 +142,7 @@ struct ProblemPage: View {
                         .foregroundStyle(palette.subText)
                 } else {
                     Text("\(game.currentPly)/\(problem.plies)")
-                        .font(Theme.number(30, weight: .black))
+                        .font(Theme.number(layout.counter, weight: .black))
                         .foregroundStyle(palette.counter)
                         .shadow(color: Theme.neonPink.opacity(0.8 * palette.glow), radius: 8)
                     Text("手目")
@@ -145,7 +155,7 @@ struct ProblemPage: View {
 
     // MARK: 盤の下
 
-    // 1 問目の案内か、遊んでいる途中の知らせ（王手になっていない、玉方の応手など）
+    /// 1 問目の案内か、遊んでいる途中の知らせ（王手になっていない、玉方の応手など）
     private var statusLine: some View {
         Group {
             if let guide = game.guide {
@@ -155,8 +165,10 @@ struct ProblemPage: View {
             }
         }
         .font(.system(size: 14, weight: .semibold))
-        .lineLimit(2)
-        .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+        // 1 行に固定する。長い文は文字を小さくして収める（2 行になると盤が縮むため）
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity, minHeight: 20, maxHeight: 20, alignment: .leading)
         .animation(.default, value: game.message)
     }
 
@@ -180,24 +192,30 @@ struct ProblemPage: View {
                         handTile(item)
                     }
                 }
-                if case .hand = game.selection {
-                    Text("選択中 ・ 空きマスに打つ")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(palette.accent)
-                }
+                // いつも場所を取っておき、持ち駒を選んでいるときだけ見せる（出し入れで盤が縮まないように）
+                Text("選択中 ・ 空きマスに打つ")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.accent)
+                    .opacity(isHandSelected ? 1 : 0)
+                    .accessibilityHidden(!isHandSelected)
             }
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 64)
+        .frame(minHeight: layout.handRowHeight)
     }
 
+    /// 持ち駒の 1 枚ぶんのタイル
     private func handTile(_ item: Game.HandItem) -> some View {
         let selected = game.selection == .hand(item.kind)
         return Button {
             game.tap(hand: item.kind)
         } label: {
-            KomaView(label: Notation.label(item.kind), size: 46, tone: .hand)
-                .frame(width: 60, height: 60)
+            // 選んだ持ち駒は少し大きくして浮かせる
+            KomaView(label: Notation.label(item.kind), size: layout.handPiece, tone: .hand)
+                .scaleEffect(selected && !reduceMotion ? 1.1 : 1)
+                .offset(y: selected && !reduceMotion ? -3 : 0)
+                .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.45), value: selected)
+                .frame(width: layout.handTile, height: layout.handTile)
                 .background(RoundedRectangle(cornerRadius: 12).fill(palette.panel))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -232,16 +250,24 @@ struct ProblemPage: View {
         .accessibilityLabel("持ち駒の\(Notation.label(item.kind))" + (item.count > 1 ? "、\(item.count)枚" : ""))
     }
 
+    /// 持ち駒を選んでいるか
+    private var isHandSelected: Bool {
+        if case .hand = game.selection { return true }
+        return false
+    }
+
+    /// 間違えたときに見せる正解が、kind の持ち駒を打つ手か
     private func isRevealedDrop(_ kind: Kind) -> Bool {
         guard let m = game.revealedAnswer else { return false }
         return m.from == nil && m.kind == kind
     }
 
+    /// 間違えたときに出す、正解とやり直しのカード
     private func failCard(_ answer: String) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("正解は \(answer)").font(.system(size: 16, weight: .bold)).foregroundStyle(palette.text)
-                Text("盤の緑の枠が正解の駒と行き先です").font(.system(size: 12)).foregroundStyle(palette.subText)
+                Text("緑の枠が正解、ピンクの枠が防がれる場所です").font(.system(size: 12)).foregroundStyle(palette.subText)
             }
             Spacer()
             Button("もう一度") { game.reset() }
@@ -250,7 +276,7 @@ struct ProblemPage: View {
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .overlay(Capsule().stroke(Theme.neonPink, lineWidth: 1.5))
         }
-        .padding(14)
+        .padding(.horizontal, 14).padding(.vertical, layout.compact ? 8 : 14)
         .background(RoundedRectangle(cornerRadius: 16).fill(palette.panel.opacity(0.85)))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.neonPink.opacity(0.6), lineWidth: 1))
         .shadow(color: Theme.neonPink.opacity(0.3 * palette.glow), radius: 10)
@@ -260,7 +286,7 @@ struct ProblemPage: View {
 
     private var controls: some View {
         HStack(spacing: 56) {
-            CircleButton(systemImage: "lightbulb", color: palette.hintButton, glow: false) {
+            CircleButton(systemImage: "lightbulb", color: palette.hintButton, glow: false, size: layout.circleButton) {
                 game.showHint()
             }
             .overlay(alignment: .topTrailing) {
@@ -275,7 +301,8 @@ struct ProblemPage: View {
             .disabled(game.status != .playing || game.hintLevel >= 2)
             .accessibilityLabel(game.hintLevel == 0 ? "ヒント" : "ヒント、\(game.hintLevel)回目まで使用")
 
-            CircleButton(systemImage: "arrow.counterclockwise", color: palette.resetButton, glow: !palette.plain) {
+            CircleButton(systemImage: "arrow.counterclockwise", color: palette.resetButton, glow: !palette.plain,
+                         size: layout.circleButton) {
                 game.reset()
             }
             .accessibilityLabel("盤面をリセット")
@@ -284,21 +311,22 @@ struct ProblemPage: View {
     }
 }
 
-// レーティングと連勝数のカード
+/// レーティングと連勝数のカード
 struct RatingCard: View {
     let problemKey: String
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
+    @Environment(\.pageLayout) private var layout
 
     var body: some View {
-        // 連勝の目盛りは 5 つ。5 連勝ごとに一周する
+        /// 連勝の目盛りは 5 つ。5 連勝ごとに一周する
         let filled = session.streak == 0 ? 0 : (session.streak - 1) % 5 + 1
         HStack(spacing: 14) {
-            HolographicBadge(title: session.rankBadge, size: 46)
+            HolographicBadge(title: session.rankBadge, size: layout.badge)
             VStack(alignment: .leading, spacing: 0) {
                 Text("RATING").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
                 Text(verbatim: "\(session.rating)")
-                    .font(Theme.number(30, weight: .black))
+                    .font(Theme.number(layout.rating, weight: .black))
                     .foregroundStyle(palette.rating)
                     .shadow(color: Theme.neonCyan.opacity(0.8 * palette.glow), radius: 8)
                     .contentTransition(.numericText())
@@ -307,7 +335,7 @@ struct RatingCard: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text("SCORE").font(Theme.display(11, weight: .medium)).tracking(2).foregroundStyle(palette.subText)
                 Text(verbatim: "\(session.displayedScore)")
-                    .font(Theme.number(22, weight: .black))
+                    .font(Theme.number(layout.score, weight: .black))
                     .foregroundStyle(palette.accent)
                     .shadow(color: Theme.goldGlow.opacity(0.7 * palette.glow), radius: 6)
                     .anchorPreference(key: ScoreTargetKey.self, value: .bounds) { [problemKey: $0] }
@@ -347,7 +375,7 @@ struct RatingCard: View {
                 }
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, 16).padding(.vertical, layout.cardPadding)
         .background(RoundedRectangle(cornerRadius: 18).fill(palette.panel.opacity(0.85)))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(palette.panelStroke, lineWidth: 1))
         .animation(.spring, value: session.rating)
@@ -356,7 +384,7 @@ struct RatingCard: View {
     }
 }
 
-// 丸い枠のボタン
+/// 丸い枠のボタン
 struct CircleButton: View {
     let systemImage: String
     let color: Color
@@ -379,7 +407,7 @@ struct CircleButton: View {
     }
 }
 
-// 画面の背景。ネオンの見た目では、上にピンク、下にシアンのぼんやりした光を置く
+/// 画面の背景。ネオンの見た目では、上にピンク、下にシアンのぼんやりした光を置く
 struct NeonBackdrop: View {
     @Environment(\.palette) private var palette
     @Environment(TiltMotion.self) private var tilt

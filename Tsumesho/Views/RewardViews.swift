@@ -102,7 +102,7 @@ struct FeedbackPreviewView: View {
 
     var body: some View {
         List {
-            Section("連勝ごとの音・振動・詰み演出") {
+            Section("連勝ごとの振動・詰み演出") {
                 ForEach([1, 3, 5, 10], id: \.self) { streak in
                     Button(streak == 1 ? "通常の正解" : "\(streak)連勝") { preview(streak: streak, rankUp: false) }
                 }
@@ -142,7 +142,8 @@ struct FeedbackPreviewView: View {
         }
         .onDisappear {
             previewTask?.cancel()
-            NativeFeedback.stop()
+            Haptics.stop()
+            Sound.stop()
         }
     }
 
@@ -151,7 +152,8 @@ struct FeedbackPreviewView: View {
         let gain = ScoreGain.make(plies: 3, size: .full, seconds: 8, hintsUsed: 0, streak: streak)
         let item = SolveReward(gain: gain, streak: streak, previousRank: "初", rank: rankUp ? "二" : "初")
         reward = item
-        NativeFeedback.play(rankUp ? .rankUp : .mate(streak), sound: session.soundOn, haptics: session.hapticsOn)
+        Haptics.play(rankUp ? .rankUp : .mate(streak), enabled: session.hapticsOn)
+        if !rankUp { Sound.playMate(volume: session.soundVolume) }
         previewTask = Task { @MainActor in
             do {
                 try await Task.sleep(for: .seconds(rankUp ? 1.8 : 1.6))
@@ -159,7 +161,7 @@ struct FeedbackPreviewView: View {
                 try await Task.sleep(for: .milliseconds(500))
                 flight = ScoreFlight()
                 try await Task.sleep(for: .milliseconds(450))
-                NativeFeedback.play(.score, sound: session.soundOn, haptics: session.hapticsOn)
+                Haptics.play(.score, enabled: session.hapticsOn)
                 withAnimation(reduceMotion ? nil : .smooth(duration: 0.6)) { displayedScore += gain.points }
                 try await Task.sleep(for: .milliseconds(600))
                 flight = nil

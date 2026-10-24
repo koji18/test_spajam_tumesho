@@ -147,6 +147,8 @@ struct BoardView: View {
                 startedAt: rippleStartedAt, reduceMotion: reduceMotion))
         }
         .aspectRatio(1, contentMode: .fit)
+        .modifier(ShakeEffect(animatableData: reduceMotion ? 0 : CGFloat(game.mistakes)))
+        .animation(.linear(duration: 0.4), value: game.mistakes)
         .task(id: game.lastMove) {
             rippleStartedAt = nil
             guard let move = game.lastMove else {
@@ -160,7 +162,7 @@ struct BoardView: View {
             do {
                 if !reduceMotion { try await Task.sleep(for: .milliseconds(180)) }
                 try Task.checkCancellation()
-                NativeFeedback.play(.landing, sound: session.soundOn, haptics: session.hapticsOn)
+                Haptics.play(.landing, enabled: session.hapticsOn)
                 if case .solved = game.status, !reduceMotion { rippleStartedAt = Date() }
                 try await Task.sleep(for: .milliseconds(180))
                 moving = nil
@@ -209,6 +211,7 @@ struct BoardView: View {
         let isHintSource = game.hintSources.contains(i)
         let isHintTarget = game.hintTargets.contains(i)
         let isRevealed = game.revealedAnswer.map { $0.from == i || $0.to == i } ?? false
+        let isRefutation = game.refutation.map { $0.from == i || $0.to == i } ?? false
 
         Button {
             game.tap(square: i)
@@ -227,6 +230,11 @@ struct BoardView: View {
                 }
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
+                }
+                if isRefutation {
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.neonPink.opacity(0.25)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.neonPink, lineWidth: 3).padding(2)
+                        .shadow(color: Theme.neonPink.opacity(palette.glow), radius: 5)
                 }
                 if isRevealed {
                     RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
@@ -304,5 +312,16 @@ private struct MateRippleEffect: ViewModifier {
                 maxSampleOffset: CGSize(width: 16, height: 16),
                 isEnabled: startedAt != nil && elapsed < 0.9 && !reduceMotion)
         }
+    }
+}
+
+/// 盤を左右に揺らす動き。animatableData が 1 増えるあいだに 3 往復する
+struct ShakeEffect: GeometryEffect {
+    var animatableData: CGFloat
+
+    /// 揺れの横ずれ。往復の真ん中ほど大きく、始めと終わりは 0
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let x = 9 * sin(animatableData * .pi * 6)
+        return ProjectionTransform(CGAffineTransform(translationX: x, y: 0))
     }
 }

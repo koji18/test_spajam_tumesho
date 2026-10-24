@@ -13,20 +13,22 @@ final class ProblemFeed {
     private var generating: Set<BoardSize> = []
     private let worker = GeneratorWorker()
 
+    /// size の盤の問題の列
     func problems(_ size: BoardSize) -> [Problem] { lists[size] ?? [] }
 
-    // size の列の index 番目の問題が表示されそうになったら呼ぶ
+    /// size の列の index 番目の問題が表示されそうになったら呼ぶ
     func didShow(index: Int, size: BoardSize) {
         wantedCount[size] = max(wantedCount[size] ?? 0, index + 1 + Self.lookahead)
         fill(size)
     }
 
+    /// 作り置きが足りなければ、size の盤の問題を 1 問作って列に足す。足りるまで繰り返す
     private func fill(_ size: BoardSize) {
         let count = problems(size).count
         guard !generating.contains(size), count < wantedCount[size] ?? 0 else { return }
         generating.insert(size)
-        // 作った問題の通し番号。最初の 3 問は 1 手詰めで慣れてもらい、そのあとは 1 手詰めと 3 手詰めを 1:2 で混ぜる。
-        // 正解が持ち駒を打つ手の問題は 2 問に 1 問までにして、金打ばかりにならないようにする
+        /// 作った問題の通し番号。最初の 3 問は 1 手詰めで慣れてもらい、そのあとは 1 手詰めと 3 手詰めを 1:2 で混ぜる。
+        /// 正解が持ち駒を打つ手の問題は 2 問に 1 問までにして、金打ばかりにならないようにする
         let n = count - 1
         let plies = n < 3 || n % 3 == 0 ? 1 : 3
         let allowDrop = n % 2 == 0
@@ -41,10 +43,11 @@ final class ProblemFeed {
     }
 }
 
-// 問題づくりは時間がかかるので、メインスレッドの外で動かす
+/// 問題づくりは時間がかかるので、メインスレッドの外で動かす
 actor GeneratorWorker {
     private var generator = ProblemGenerator(seed: UInt64.random(in: 1...UInt64.max))
 
+    /// size の盤で plies 手詰めの問題を 1 問作る
     func make(size: BoardSize, plies: Int, allowDrop: Bool) -> Problem? {
         let maxPieces = (size == .small ? 5 : 6) + (plies == 3 ? 1 : 0)
         return generator.next(size: size, plies: plies, maxPieces: maxPieces, allowDrop: allowDrop)

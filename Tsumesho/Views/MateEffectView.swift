@@ -1,12 +1,12 @@
 import SwiftUI
 
-// 詰んだときの演出。問題の列の上のレイヤーに出す（FeedView）。文字は「詰」の一文字だけにする。
-// 動きはすべて表示されてからの経過時間 t（秒）で決める：
-//   0.00〜  白い閃光が消えていき、画面が揺れる
-//   0.00〜  光の筋が中央から広がり、ゆっくり回る。金の輪が 2 重に広がる
-//   0.00〜  金色の駒の形の紙吹雪と粒が飛び散り、星がきらめく
-//   0.00〜  「詰」が大きく傾いた状態から弾んで収まる
-// タップするとすぐ次の問題へ進む
+/// 詰んだときの演出。問題の列の上のレイヤーに出す（FeedView）。文字は「詰」の一文字だけにする。
+/// 動きはすべて表示されてからの経過時間 t（秒）で決める：
+///   0.00〜  白い閃光が消えていき、画面が揺れる
+///   0.00〜  光の筋が中央から広がり、ゆっくり回る。金の輪が 2 重に広がる
+///   0.00〜  金色の駒の形の紙吹雪と粒が飛び散り、星がきらめく
+///   0.00〜  「詰」が大きく傾いた状態から弾んで収まる
+/// タップするとすぐ次の問題へ進む
 struct MateEffectView: View {
     let plies: Int
     let seconds: Int
@@ -18,12 +18,12 @@ struct MateEffectView: View {
     @State private var start = Date()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // 光の筋としぶきの中心。「詰」の文字の位置に合わせる
+    /// 光の筋としぶきの中心。「詰」の文字の位置に合わせる
     static let centerRatio: CGFloat = 0.42
 
     var body: some View {
         TimelineView(.animation(paused: reduceMotion)) { timeline in
-            // 動きを減らす設定のときは、動き終わったあとの姿だけを見せる
+            /// 動きを減らす設定のときは、動き終わったあとの姿だけを見せる
             let t = reduceMotion ? 1.5 : timeline.date.timeIntervalSince(start)
             GeometryReader { geo in
                 let area = geo.size
@@ -110,12 +110,12 @@ struct MateEffectView: View {
             .rotationEffect(.degrees(Self.spring(t, from: -22, to: -4)))
     }
 
-    // from から to へ、行き過ぎて戻りながら収まる動き
+    /// from から to へ、行き過ぎて戻りながら収まる動き
     static func spring(_ t: Double, from: Double, to: Double) -> Double {
         to + (from - to) * exp(-7 * t) * cos(13 * t)
     }
 
-    // 最初の 0.4 秒だけ画面を揺らす
+    /// 最初の 0.4 秒だけ画面を揺らす
     static func shake(_ t: Double) -> CGSize {
         guard t < 0.4 else { return .zero }
         let amount = 9 * (1 - t / 0.4)
@@ -123,7 +123,7 @@ struct MateEffectView: View {
     }
 }
 
-// 中央から放射状に伸びる光の筋。5 色を重ねて明るく光らせ、ゆっくり回す
+/// 中央から放射状に伸びる光の筋。5 色を重ねて明るく光らせ、ゆっくり回す
 private struct MateRays: View {
     let seed: Int
     let t: Double
@@ -154,7 +154,7 @@ private struct MateRays: View {
         .allowsHitTesting(false)
     }
 
-    // 根元が太く、先がとがった光の筋
+    /// 根元が太く、先がとがった光の筋
     private func wedge(center: CGPoint, angle: Double, start: Double, end: Double, halfWidth: Double) -> Path {
         let dir = CGPoint(x: cos(angle), y: sin(angle))
         let perp = CGPoint(x: -dir.y, y: dir.x)
@@ -168,7 +168,7 @@ private struct MateRays: View {
     }
 }
 
-// 「詰」の後ろの墨だまりと、金の筆のはらい・しぶき
+/// 「詰」の後ろの墨だまりと、金の筆のはらい・しぶき
 private struct GoldSplash: View {
     let seed: Int
 
@@ -182,6 +182,7 @@ private struct GoldSplash: View {
                 Gradient(colors: [Theme.cream, Theme.goldGlow, Color(red: 0.62, green: 0.42, blue: 0.1)]),
                 startPoint: CGPoint(x: center.x, y: center.y - unit * 0.4),
                 endPoint: CGPoint(x: center.x, y: center.y + unit * 0.4))
+            /// 中心から distance 離れたランダムな向きに、半径 radius の点を描く
             func dot(_ distance: Double, _ radius: Double, _ shading: GraphicsContext.Shading) {
                 let a = Double(rng.int(0...359)) * .pi / 180
                 let c = CGPoint(x: center.x + cos(a) * distance, y: center.y + sin(a) * distance)
@@ -208,7 +209,7 @@ private struct GoldSplash: View {
     }
 }
 
-// 広がる金の輪、飛び散る駒の形の紙吹雪と粒、きらめく星
+/// 広がる金の輪、飛び散る駒の形の紙吹雪と粒、きらめく星
 private struct Burst: View {
     let seed: Int
     let t: Double
@@ -230,7 +231,7 @@ private struct Burst: View {
                            with: .color(Theme.goldGlow.opacity(1 - p)), lineWidth: 10 * (1 - p) + 1)
             }
 
-            // 紙吹雪と粒。外へ飛び出して減速し、少し落ちながら消える
+            /// 紙吹雪と粒。外へ飛び出して減速し、少し落ちながら消える
             let fade = max(0, 1 - t / 2.4)
             for i in 0..<80 {
                 let angle = Double(rng.int(0...359)) * .pi / 180
