@@ -259,7 +259,7 @@ struct ProblemPage: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("正解は \(answer)").font(.system(size: 16, weight: .bold)).foregroundStyle(palette.text)
-                Text("盤の緑の枠が正解の駒と行き先です").font(.system(size: 12)).foregroundStyle(palette.subText)
+                Text("緑の枠が正解、ピンクの枠が防がれる場所です").font(.system(size: 12)).foregroundStyle(palette.subText)
             }
             Spacer()
             Button("もう一度") { game.reset() }

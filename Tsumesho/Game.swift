@@ -35,6 +35,8 @@ final class Game {
     private(set) var hintTargets: Set<Int> = []
     /// 間違えたときに盤で見せる正解の手
     private(set) var revealedAnswer: Move?
+    /// 間違えたときに盤で見せる、玉方の防ぎ方（指す前の盤に重ねて、そのマスを光らせる）
+    private(set) var refutation: Move?
     /// 間違えた回数（王手でない手を指そうとしたときも数える）。盤を揺らすきっかけに使う
     private(set) var mistakes = 0
     var pendingPromotion: (promote: Move, stay: Move)?
@@ -186,6 +188,7 @@ final class Game {
         hintLevel = 0
         refreshHints()
         revealedAnswer = nil
+        refutation = nil
         firstMoveCaptured = false
         startedAt = Date()
     }
@@ -227,7 +230,13 @@ final class Game {
             revealedAnswer = answers.first
             let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)
-            message = "残念、その手だと玉に逃げられます"
+            // 玉方がどう防ぐかを見せる
+            if let reply = before.refutation(of: m, plies: pliesLeft - 2, where: filter) {
+                refutation = reply
+                message = "残念、" + Notation.explainDefense(reply, after: before.playing(m), check: m)
+            } else {
+                message = "残念、その手だと詰みません"
+            }
             return
         }
         position = before.playing(m)

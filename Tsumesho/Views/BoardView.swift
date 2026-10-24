@@ -232,6 +232,7 @@ struct BoardView: View {
         let isHintSource = game.hintSources.contains(i)
         let isHintTarget = game.hintTargets.contains(i)
         let isRevealed = game.revealedAnswer.map { $0.from == i || $0.to == i } ?? false
+        let isRefutation = game.refutation.map { $0.from == i || $0.to == i } ?? false
 
         Button {
             game.tap(square: i)
@@ -250,6 +251,11 @@ struct BoardView: View {
                 }
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
+                }
+                if isRefutation {
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.neonPink.opacity(0.25)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.neonPink, lineWidth: 3).padding(2)
+                        .shadow(color: Theme.neonPink.opacity(palette.glow), radius: 5)
                 }
                 if isRevealed {
                     RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)

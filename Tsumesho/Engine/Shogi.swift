@@ -246,6 +246,18 @@ extension Position {
         !mateMoves(plies: plies, where: filter, firstOnly: true).isEmpty
     }
 
+    /// 攻め方の手 check が間違いだったときに、それを防ぐ玉方の応手を 1 つ選ぶ。
+    /// 防いだあと plies 手以内に詰ませられない応手のうち、いちばんわかりやすい防ぎ方（Notation.Defense の順）を選ぶ
+    func refutation(of check: Move, plies: Int, where filter: ((Move) -> Bool)? = nil) -> Move? {
+        let after = playing(check)
+        let refuting = after.legalMoves().filter { reply in
+            plies < 1 || !after.playing(reply).forcesMate(plies: plies, where: filter)
+        }
+        return refuting.min { a, b in
+            Notation.defense(a, after: after, check: check) < Notation.defense(b, after: after, check: check)
+        }
+    }
+
     /// 玉方の応手を選ぶ。攻め方の詰ませ方がいちばん少なくなる手を選び、
     /// 同じなら盤上の駒を動かす手を合駒（打つ手）より優先する。
     func bestDefense(plies: Int, where filter: ((Move) -> Bool)? = nil) -> Move? {
@@ -360,6 +372,51 @@ enum Notation {
         guard let from = m.from, let p = pos.board[from] else { return "持ち駒の\(names[m.kind]!)を\(at)に打つ" }
         let origin = fileLabel(Square.file(from)) + rankLabel(Square.rank(from))
         return "\(origin)の\(label(p))を\(at)へ" + (m.promote ? "動かして成る" : "")
+    }
+
+    /// 玉方の防ぎ方の種類。わかりやすいものほど前に並べる
+    enum Defense: Int, Comparable {
+        case kingCaptures   // 玉が王手の駒を取る
+        case captures       // ほかの駒で王手の駒を取る
+        case dropBlock      // 間に駒を打つ（合駒）
+        case moveBlock      // 間に駒を動かす
+        case kingEscapes    // 玉が逃げる
+        case other          // 王手は防いだあと、その先で詰まない（3 手詰めの初手を間違えたとき）
+
+        static func < (a: Defense, b: Defense) -> Bool { a.rawValue < b.rawValue }
+    }
+
+    /// 攻め方の手 check を指したあとの局面 after で、玉方の応手 reply がどういう防ぎ方か
+    static func defense(_ reply: Move, after: Position, check: Move) -> Defense {
+        let king = after.kingSquare(.white)
+        if reply.from == nil { return .dropBlock }
+        if reply.to == check.to { return reply.from == king ? .kingCaptures : .captures }
+        if reply.from == king { return .kingEscapes }
+        return after.inCheck(.white) ? .moveBlock : .other
+    }
+
+    /// 玉方の防ぎ方の説明。例「１二に金を打たれて防がれます（合駒）」「玉に１四の飛車を取られます」
+    static func explainDefense(_ reply: Move, after: Position, check: Move) -> String {
+        let at = fileLabel(Square.file(reply.to)) + rankLabel(Square.rank(reply.to))
+        switch defense(reply, after: after, check: check) {
+        case .kingCaptures:
+            return "玉に\(at)の\(after.board[reply.to].map(label) ?? "")を取られます"
+        case .captures:
+            return "\(origin(reply))の\(after.board[reply.from!].map(label) ?? "")で取られます"
+        case .dropBlock:
+            return "\(at)に\(names[reply.kind]!)を打たれて防がれます（合駒）"
+        case .moveBlock:
+            return "\(origin(reply))の\(after.board[reply.from!].map(label) ?? "")を\(at)に動かされて防がれます"
+        case .kingEscapes:
+            return "玉に\(at)へ逃げられます"
+        case .other:
+            return "玉方の\(label(reply, in: after))で、その先が詰みません"
+        }
+    }
+
+    private static func origin(_ m: Move) -> String {
+        guard let from = m.from else { return "" }
+        return fileLabel(Square.file(from)) + rankLabel(Square.rank(from))
     }
 
     /// 手筋の名前。判定できるものだけ返す
