@@ -105,7 +105,8 @@ private struct RuleCard {
     let text: String
 }
 
-// 1 枚ぶん。朱の印に入れた漢数字、見出し、絵、説明の順に並べ、縦の真ん中に寄せる
+// 1 枚ぶん。朱の印に入れた漢数字、見出し、絵、説明の順に並べ、縦の真ん中に寄せる。
+// 小さい画面で収まらないときだけ、縦にスクロールできる
 private struct RulePage: View {
     let number: Int
     let card: RuleCard
@@ -113,6 +114,17 @@ private struct RulePage: View {
     private static let numerals = ["一", "二", "三", "四", "五", "六"]
 
     var body: some View {
+        GeometryReader { geo in
+            ScrollView {
+                content
+                    .frame(minHeight: geo.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer(minLength: 0)
             HStack(spacing: 12) {
