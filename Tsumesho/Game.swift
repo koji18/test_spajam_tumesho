@@ -95,25 +95,30 @@ final class Game {
 
     // MARK: ヒント
 
-    // 1 回目：王手をかけられる駒を光らせる。2 回目：正解の行き先を光らせる
-    var hintSources: Set<Int> {
-        guard hintLevel >= 1 else { return [] }
-        return Set(position.checkMoves(where: Self.isInView).compactMap(\.from))
-    }
-
-    var hintHandKinds: Set<Kind> {
-        guard hintLevel >= 1 else { return [] }
-        return Set(position.checkMoves(where: Self.isInView).filter { $0.from == nil }.map(\.kind))
-    }
-
-    var hintTargets: Set<Int> {
-        guard hintLevel >= 2 else { return [] }
-        return Set(position.mateMoves(plies: pliesLeft, where: Self.isInView).map(\.to))
-    }
-
+    // 1 回目：王手をかけられる駒を光らせる。2 回目：正解の駒と行き先だけを光らせる
     func showHint() {
-        guard status == .playing else { return }
-        hintLevel = min(hintLevel + 1, 2)
+        guard status == .playing, hintLevel < 2 else { return }
+        hintLevel += 1
+        refreshHints()
+    }
+
+    private func refreshHints() {
+        switch hintLevel {
+        case 1:
+            let checks = position.checkMoves(where: filter)
+            hintSources = Set(checks.compactMap(\.from))
+            hintHandKinds = Set(checks.filter { $0.from == nil }.map(\.kind))
+            hintTargets = []
+        case 2:
+            let answers = position.mateMoves(plies: pliesLeft, where: filter)
+            hintSources = Set(answers.compactMap(\.from))
+            hintHandKinds = Set(answers.filter { $0.from == nil }.map(\.kind))
+            hintTargets = Set(answers.map(\.to))
+        default:
+            hintSources = []
+            hintHandKinds = []
+            hintTargets = []
+        }
     }
 
     // MARK: 操作
@@ -156,6 +161,8 @@ final class Game {
         targets = []
         lastMove = nil
         hintLevel = 0
+        refreshHints()
+        revealedAnswer = nil
         firstMoveCaptured = false
     }
 
