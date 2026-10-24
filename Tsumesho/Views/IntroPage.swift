@@ -207,9 +207,10 @@ struct IntroPage: View {
     // 選んでいるモードの一言。チュートリアルでは、いまどこまで進んだかを出す
     @ViewBuilder
     private var modeNote: some View {
+        let total = TutorialStage.all.count
         let text: String = switch session.mode {
         case .tutorial:
-            session.tutorialDone ? "7段階を修了ずみ。いつでも復習できます" : "7段階で学ぶ。いま \(session.tutorialSolved) / 7 段を修了"
+            session.tutorialDone ? "\(total)段階を修了ずみ。いつでも復習できます" : "\(total)段階で学ぶ。いま \(session.tutorialSolved) / \(total) 段を修了"
         case .normal:
             "自分のペースで、ずっと解ける"
         case .timeTrial:

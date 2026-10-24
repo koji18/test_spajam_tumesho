@@ -441,7 +441,7 @@ private struct ScoreIllustration: View {
 private struct ModesIllustration: View {
     @State private var selected = 0
     private let names = ["チュートリアル", "ノーマル", "タイム"]
-    private let notes = ["7段階で学ぶ。まずはここから", "自分のペースで、ずっと解ける", "60秒から。正解で時間が増える"]
+    private let notes = ["\(TutorialStage.all.count)段階で学ぶ。まずはここから", "自分のペースで、ずっと解ける", "60秒から。正解で時間が増える"]
 
     var body: some View {
         VStack(spacing: 22) {
