@@ -47,14 +47,14 @@ enum Sound {
         return player
     }
 
-    /// 詰みの音を上げる上限（半音いくつ分か）。9 連勝で頭打ちになる
-    static let maxMateSemitones = 8
+    /// 詰みの音の高さを、連勝ごとにドレミファソラシドの音階で上げる（元の高さから半音いくつ分か）。
+    /// 1 連勝がド、8 連勝で 1 オクターブ上のドになり、そこで頭打ち
+    static let mateScale = [0, 2, 4, 5, 7, 9, 11, 12]
 
-    /// 連勝 streak のときの詰みの音の速さ。1 連勝は元の高さで、連勝が 1 つ増えるごとに半音ずつ上げる。
-    /// 速く鳴らして高くするので、高いほど音は少し短くなる
+    /// 連勝 streak のときの詰みの音の速さ。速く鳴らして高くするので、高いほど音は少し短くなる
     static func mateRate(streak: Int) -> Float {
-        let semitones = min(max(streak - 1, 0), maxMateSemitones)
-        return Float(pow(2, Double(semitones) / 12))
+        let step = min(max(streak - 1, 0), mateScale.count - 1)
+        return Float(pow(2, Double(mateScale[step]) / 12))
     }
 
     /// 詰んだときの音を volume（0〜1）で鳴らす。連勝 streak が続くほど高くする。鳴っている途中なら頭から鳴らし直す
