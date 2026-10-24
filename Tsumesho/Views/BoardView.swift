@@ -162,7 +162,8 @@ struct BoardView: View {
             do {
                 if !reduceMotion { try await Task.sleep(for: .milliseconds(180)) }
                 try Task.checkCancellation()
-                Haptics.play(.landing, enabled: session.hapticsOn)
+                // 修行は静かに解く画面なので、駒を置いても振動しない
+                Haptics.play(.landing, enabled: session.hapticsOn && session.mode != .zen)
                 if case .solved = game.status, !reduceMotion { rippleStartedAt = Date() }
                 try await Task.sleep(for: .milliseconds(180))
                 moving = nil

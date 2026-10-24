@@ -43,6 +43,14 @@ struct RootView: View {
                     feed.didShow(index: 0, size: session.boardSize)
                 }
                 .transition(.move(edge: .bottom))
+            } else if playing && session.mode == .zen {
+                PracticeView(problems: session.practice.problems(size: session.boardSize)) {
+                    playing = false
+                } onNormal: {
+                    session.mode = .normal
+                    feed.didShow(index: 0, size: session.boardSize)
+                }
+                .transition(.move(edge: .bottom))
             } else if playing {
                 FeedView(feed: feed) {
                     trial.stop()
@@ -61,8 +69,8 @@ struct RootView: View {
         }
         .environment(tilt)
         .animation(.easeInOut(duration: 0.3), value: playing)
-        // ホームと入門は明るい和紙の見た目なので、いつも明るい表示にする。暗くするのは、ネオンの問題画面だけ
-        .preferredColorScheme(playing && session.mode != .tutorial && session.tutorialCleared ? .dark : .light)
+        // ホーム・入門・修行は明るい和紙の見た目なので、いつも明るい表示にする。暗くするのは、ネオンの問題画面だけ
+        .preferredColorScheme(playing && session.mode != .tutorial && session.mode != .zen && session.tutorialCleared ? .dark : .light)
         .task(id: scenePhase == .active && !reduceMotion) {
             guard scenePhase == .active, !reduceMotion else { return }
             await tilt.run()

@@ -186,6 +186,7 @@ struct IntroPage: View {
                 tab("チュートリアル", selected: session.mode == .tutorial) { session.mode = .tutorial }
                 tab("ノーマル", selected: session.mode == .normal) { session.mode = .normal }
                 tab("タイム", selected: session.mode == .timeTrial) { session.mode = .timeTrial }
+                tab("修行", selected: session.mode == .zen) { session.mode = .zen }
             }
             modeNote
             HStack(alignment: .top, spacing: 14) {
@@ -215,6 +216,10 @@ struct IntroPage: View {
             "自分のペースで、ずっと解ける"
         case .timeTrial:
             session.timeTrialBest > 0 ? "60秒から。最高 \(session.timeTrialBest) 問" : "60秒から。何問解ける？"
+        case .zen:
+            session.practice.entries.isEmpty
+                ? "ノーマルで間違えた問題を、静かに解き直す"
+                : "間違えた問題を解き直す。いま \(session.practice.entries.count) 問"
         }
         Text(text)
             .font(.system(size: 11)).foregroundStyle(Washi.inkSoft)
@@ -226,6 +231,8 @@ struct IntroPage: View {
         switch session.mode {
         case .tutorial:
             session.tutorialDone ? "もう一度" : (session.tutorialSolved > 0 ? "第\(session.tutorialNext + 1)段から" : "はじめから")
+        case .zen:
+            "解き直す"
         default:
             session.solvedTotal > 0 ? "つづきから" : "はじめから"
         }

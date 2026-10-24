@@ -73,6 +73,10 @@ struct ProblemPage: View {
         .onChange(of: game.selection) { _, selection in
             if selection != nil { Sound.playPick(volume: session.soundVolume) }
         }
+        // 間違えたら（王手でない手も含む）、ノーマルのときだけ修行用に問題を残す
+        .onChange(of: game.mistakes) { old, new in
+            if new > old { session.practice.recordMistake(problem, mode: session.mode) }
+        }
         // 間違えたとき（王手でない手も含む）。盤の揺れに合わせて鳴らす
         .sensoryFeedback(trigger: game.mistakes) { _, _ in session.hapticsOn ? .error : nil }
         .animation(.spring(duration: 0.35), value: game.status)
