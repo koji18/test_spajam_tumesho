@@ -48,8 +48,9 @@ final class Game {
         message = Self.prompt(for: problem)
     }
 
+    // 何をすればいいかの一文は 1 問目だけ出す。2 問目からは見出しの「〇手詰め」でわかる
     private static func prompt(for problem: Problem) -> String {
-        problem.plies == 1 ? "王手をかけて、玉を詰ませよう" : "王手を2回かけて、玉を詰ませよう"
+        problem.id == 1 ? "王手をかけて、玉を詰ませよう" : ""
     }
 
     struct HandItem: Identifiable {
