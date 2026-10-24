@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// 1 問ぶんの遊びの状態。盤の表示は 1〜5 筋 × 一〜五段だけなので、攻め方の手もその中に限る。
+// 1 問ぶんの遊びの状態。5×5 の小さい盤で遊ぶときは、攻め方の手も表示範囲の中に限る。
 @MainActor @Observable
 final class Game {
     enum Selection: Equatable {
@@ -16,13 +16,10 @@ final class Game {
         case failed(answer: String)
     }
 
-    nonisolated static let files = 1...5
-    nonisolated static let ranks = 1...5
-    nonisolated static func isInView(_ m: Move) -> Bool {
-        files.contains(Square.file(m.to)) && ranks.contains(Square.rank(m.to))
-    }
-
     let problem: Problem
+    // 5×5 の盤で遊ぶ問題か。表示範囲は、3 手詰めでは途中で玉が動くので、最初の局面で一度だけ決める
+    let smallBoard: Bool
+    let smallFiles: ClosedRange<Int>
     private(set) var position: Position
     private(set) var pliesLeft: Int
     private(set) var status: Status = .playing
@@ -31,13 +28,22 @@ final class Game {
     private(set) var targets: Set<Int> = []
     private(set) var lastMove: Move?
     private(set) var hintLevel = 0
+    // ヒントで光らせるマスと持ち駒。盤のマスごとに計算し直すと重いので、ヒントを押したときに一度だけ計算する
+    private(set) var hintSources: Set<Int> = []
+    private(set) var hintHandKinds: Set<Kind> = []
+    private(set) var hintTargets: Set<Int> = []
+    // 間違えたときに盤で見せる正解の手
+    private(set) var revealedAnswer: Move?
     var pendingPromotion: (promote: Move, stay: Move)?
 
     private var firstMoveCaptured = false
 
     init(problem: Problem) {
+        let start = problem.position
         self.problem = problem
-        position = problem.position
+        position = start
+        smallBoard = problem.size == .small
+        smallFiles = start.smallFiles
         pliesLeft = problem.plies
         message = Self.prompt(for: problem)
     }
@@ -57,6 +63,18 @@ final class Game {
             let n = position.hands[.black]![k.rawValue]
             return n > 0 ? HandItem(kind: k, count: n) : nil
         }
+    }
+
+    // MARK: 盤の大きさ
+
+    var visibleFiles: ClosedRange<Int> { smallBoard ? smallFiles : 1...9 }
+    var visibleRanks: ClosedRange<Int> { smallBoard ? Position.smallRanks : 1...9 }
+
+    // 攻め方が指せる手を、見えているマスへの手に限る
+    private var filter: ((Move) -> Bool)? {
+        guard smallBoard else { return nil }
+        let files = smallFiles
+        return { files.contains(Square.file($0.to)) && Position.smallRanks.contains(Square.rank($0.to)) }
     }
 
     // MARK: 1 問目の案内
@@ -149,7 +167,7 @@ final class Game {
     private func candidateMoves() -> [Move] {
         guard let selection else { return [] }
         return position.legalMoves().filter { m in
-            guard Self.isInView(m) else { return false }
+            guard filter?(m) ?? true else { return false }
             switch selection {
             case .square(let i): return m.from == i
             case .hand(let k): return m.from == nil && m.kind == k
