@@ -93,14 +93,6 @@ final class Game {
     /// 今が何手目か（1 手詰めは 1/1、3 手詰めは 1/3 から 3/3）
     var currentPly: Int { problem.plies - pliesLeft + 1 }
 
-    /// 攻め方が指せる手を、見えているマスへの手に限る
-    private var filter: ((Move) -> Bool)? {
-        guard problem.size.span < 9 else { return nil }
-        let files = windowFiles
-        let ranks = visibleRanks
-        return { files.contains(Square.file($0.to)) && ranks.contains(Square.rank($0.to)) }
-    }
-
     // MARK: 1 問目の案内
 
     /// 1 問目だけ、操作に合わせて次にやることを案内する
@@ -143,12 +135,12 @@ final class Game {
     private func refreshHints() {
         switch hintLevel {
         case 1:
-            let checks = position.checkMoves(where: filter)
+            let checks = position.checkMoves()
             hintSources = Set(checks.compactMap(\.from))
             hintHandKinds = Set(checks.filter { $0.from == nil }.map(\.kind))
             hintTargets = []
         case 2:
-            let answers = position.mateMoves(plies: pliesLeft, where: filter)
+            let answers = position.mateMoves(plies: pliesLeft)
             hintSources = Set(answers.compactMap(\.from))
             hintHandKinds = Set(answers.filter { $0.from == nil }.map(\.kind))
             hintTargets = Set(answers.map(\.to))
@@ -189,7 +181,7 @@ final class Game {
     /// 持ち駒の歩を square に打つと反則（二歩・打ち歩詰め）になるときの説明。反則でなければ nil
     private func illegalPawnDrop(at square: Int) -> String? {
         let drop = Move(from: nil, to: square, kind: .pawn)
-        guard position.board[square] == nil, filter?(drop) ?? true else { return nil }
+        guard position.board[square] == nil else { return nil }
         let file = Square.file(square)
         let doublePawn = (1...9).contains { rank in
             let p = position.board[Square.index(file: file, rank: rank)]
@@ -220,7 +212,7 @@ final class Game {
 
     /// 答えを見る。王手でない手を指して失敗にならなかったときは、いまの局面から正解を求める
     func showAnswer() {
-        if answerMove == nil { answerMove = position.mateMoves(plies: pliesLeft, where: filter).first }
+        if answerMove == nil { answerMove = position.mateMoves(plies: pliesLeft).first }
         answerShown = true
         answerUsed = true
     }
@@ -266,11 +258,10 @@ final class Game {
         targets = Set(candidateMoves().map(\.to))
     }
 
-    /// 選んでいる駒か持ち駒で指せる、表示範囲の中の合法手
+    /// 選んでいる駒か持ち駒で指せる合法手
     private func candidateMoves() -> [Move] {
         guard let selection else { return [] }
         return position.legalMoves().filter { m in
-            guard filter?(m) ?? true else { return false }
             switch selection {
             case .square(let i): return m.from == i
             case .hand(let k): return m.from == nil && m.kind == k
@@ -288,7 +279,7 @@ final class Game {
             return
         }
         let before = position
-        let answers = before.mateMoves(plies: pliesLeft, where: filter)
+        let answers = before.mateMoves(plies: pliesLeft)
         hintLevel = 0
         refreshHints()
 
@@ -300,7 +291,7 @@ final class Game {
             let answer = answers.first.map { Notation.describe($0, in: before) } ?? ""
             status = .failed(answer: answer)
             // 玉方がどう防ぐかを見せる
-            if let reply = before.refutation(of: m, plies: pliesLeft - 2, where: filter) {
+            if let reply = before.refutation(of: m, plies: pliesLeft - 2) {
                 refutation = reply
                 message = "残念、" + Notation.explainDefense(reply, after: before.playing(m), check: m)
             } else {
@@ -328,7 +319,7 @@ final class Game {
             // 待っているあいだに盤面をリセットされたら、応手を指さない
             do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
             guard !Task.isCancelled, status == .thinking,
-                  let reply = position.bestDefense(plies: pliesLeft, where: filter) else { return }
+                  let reply = position.bestDefense(plies: pliesLeft) else { return }
             let replyLabel = Notation.label(reply, in: position)
             firstMoveCaptured = reply.to == m.to
             position = position.playing(reply)

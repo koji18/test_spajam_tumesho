@@ -28,7 +28,12 @@ struct Problem: Identifiable, Codable {
     // 入門チュートリアルの問題だけが持つ、この問題で学ぶことの説明（Tutorial.swift）
     var lesson: String? = nil
 
-    var position: Position { Position(problem: board, attackerHand: hand) }
+    /// 問題の最初の局面。5×5・7×7 では、見えている範囲だけを盤にする
+    var position: Position {
+        var pos = Position(problem: board, attackerHand: hand)
+        pos.span = size.span
+        return pos
+    }
 
     /// 画面で問題を見分けるためのキー。id は盤の大きさごとに 1 から振るので、大きさと組にする
     var key: String { "\(size.rawValue)-\(id)" }
@@ -55,7 +60,7 @@ struct Problem: Identifiable, Codable {
 
 /// 9×9 より小さい盤で遊ぶときの表示範囲。いつも右上の隅（1〜span 筋 × 一〜span 段）を切り出す。
 /// 問題ごとに切り出す位置を変えると、筋の番号が問題ごとに変わってしまうため。
-/// 小さい盤の問題は、駒がすべてこの範囲に入り、範囲の中だけで指しても正解が変わらないことを確かめている。
+/// 小さい盤では、この範囲が盤そのもの（Position.span）。範囲の外へは、攻め方も玉方も動けない。
 extension Position {
     /// 表示する筋の範囲。9×9 より小さい盤では右上の隅の 1〜span 筋
     func windowFiles(span: Int) -> ClosedRange<Int> {

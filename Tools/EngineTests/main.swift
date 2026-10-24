@@ -47,6 +47,21 @@ do {
     expect(!w.legalMoves().contains { $0.from == at(5, 2) && Square.file($0.to) != 5 }, "ピンされた金は筋から外れられない")
 }
 
+do {
+    // 5×5 では、見えている範囲が盤の端。玉は範囲の外（６一）へ逃げられないので、５二に飛を打っても詰む。
+    // 9×9 なら６一へ逃げられるので、詰むのは４一飛打だけ
+    var p = Position(problem: "4k2B1/6+RP1/9/9/9/9/9/9/9", attackerHand: "R")
+    let fullMates = Set(p.mateMoves(plies: 1).map { Notation.label($0, in: p) })
+    expect(fullMates == ["４一飛打"], "9×9 では４一飛打だけが詰み")
+    p.span = 5
+    let smallMates = Set(p.mateMoves(plies: 1).map { Notation.label($0, in: p) })
+    expect(smallMates == ["４一飛打", "５二飛打"], "5×5 では５二飛打でも詰む（離して打つと合駒される）")
+    expect(p.legalMoves().allSatisfy { p.isInWindow($0.to, span: 5) }, "5×5 では範囲の外に指せない")
+    var w = p.playing(Move(from: nil, to: Square.index(file: 3, rank: 1), kind: .rook))
+    w.turn = .white
+    expect(w.legalMoves().allSatisfy { w.isInWindow($0.to, span: 5) }, "玉方も範囲の外へは動けない")
+}
+
 // 出題する問題の条件。固定の問題にも、アプリが裏で作る問題にも同じ条件をかける
 func check(_ q: Problem, _ name: String) {
     let p = q.position
@@ -57,11 +72,7 @@ func check(_ q: Problem, _ name: String) {
     expect(answers.first.map { Notation.label($0, in: p) } == q.answer, "\(name)：正解は \(q.answer)")
     let occupied = p.board.indices.filter { p.board[$0] != nil }
     let span = q.size.span
-    if span < 9 {
-        let window: (Move) -> Bool = { p.isInWindow($0.to, span: span) }
-        expect(occupied.allSatisfy { p.isInWindow($0, span: span) } && p.mateMoves(plies: q.plies, where: window) == answers,
-               "\(name)：\(q.size.label) の範囲だけで同じ正解になる")
-    }
+    expect(p.span == span && occupied.allSatisfy { p.isInWindow($0, span: span) }, "\(name)：駒がすべて \(q.size.label) の盤に入っている")
     if q.size != .small && q.id != 1 {  // 1 問目はどの盤でも同じチュートリアル用の例題
         expect(!occupied.allSatisfy { p.isInWindow($0, span: 5) }, "\(name)：5×5 の範囲の外にも駒がある（盤の広さを使う）")
     }
