@@ -37,6 +37,8 @@ final class Game {
     /// 間違えたときに盤で見せる正解の手。入門では、答えを見るボタンを押すまで見せない（answerOnDemand）
     private var answerMove: Move?
     private(set) var answerShown = false
+    /// この問題で一度でも「答えを見る」を押したか。リセットしても残し、入門の星を 1 つにするのに使う
+    private(set) var answerUsed = false
     var answerOnDemand = false
     var revealedAnswer: Move? { answerOnDemand && !answerShown ? nil : answerMove }
     /// 間違えたときに盤で見せる、玉方の防ぎ方（指す前の盤に重ねて、そのマスを光らせる）
@@ -220,6 +222,7 @@ final class Game {
     func showAnswer() {
         if answerMove == nil { answerMove = position.mateMoves(plies: pliesLeft, where: filter).first }
         answerShown = true
+        answerUsed = true
     }
 
     /// 見せている正解の手の説明（「３二に金を打つ」など）

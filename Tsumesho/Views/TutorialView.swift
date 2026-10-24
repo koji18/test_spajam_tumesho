@@ -160,7 +160,6 @@ private struct StagePage: View {
 
     @Environment(Session.self) private var session
     @State private var game: Game
-    @State private var misses = 0
     @State private var cleared = false
     @State private var stampScale: CGFloat = 2.2
     @State private var stampOpacity = 0.0
@@ -209,7 +208,6 @@ private struct StagePage: View {
             switch status {
             case .solved: solved()
             case .failed:
-                misses += 1
                 if session.hapticsOn { UINotificationFeedbackGenerator().notificationOccurred(.error) }
             default: break
             }
@@ -229,9 +227,14 @@ private struct StagePage: View {
         return game
     }
 
-    // 星は、ミスもヒントもなければ 3、どちらかなら 2、両方なら 1
     private var earnedStars: Int {
-        3 - (misses > 0 ? 1 : 0) - (game.hintsUsed > 0 ? 1 : 0)
+        TutorialStage.stars(mistakes: game.mistakes, hintsUsed: game.hintsUsed, answerUsed: game.answerUsed)
+    }
+
+    private var starNote: String {
+        if game.answerUsed { return "答えを見ました" }
+        if earnedStars == 3 { return "ノーミス！" }
+        return game.hintsUsed > 0 ? "ヒントを使いました" : "ミスがありました"
     }
 
     private func solved() {
@@ -305,7 +308,6 @@ private struct StagePage: View {
         game.start()
         burstStart = nil
         sealOpacity = 0
-        misses = 0
         cleared = false
         stampOpacity = 0
         stampScale = 2.2
@@ -368,7 +370,7 @@ private struct StagePage: View {
                     .font(.system(size: 14))
                     .foregroundStyle(i < earnedStars ? Washi.vermilion : Washi.kayaEdge.opacity(0.5))
             }
-            Text(earnedStars == 3 ? "ノーミス！" : (game.hintsUsed > 0 ? "ヒントを使いました" : "ミスがありました"))
+            Text(starNote)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Washi.inkSoft)
                 .padding(.leading, 4)

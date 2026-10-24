@@ -11,6 +11,12 @@ struct TutorialStage: Identifiable {
 
     var id: Int { number }
 
+    /// 解いたときの星。答えを見たら 1。そうでなければ 3 から、ミス（王手でない手・反則・詰まない手）があれば 1、ヒントを使えば 1 減らす
+    static func stars(mistakes: Int, hintsUsed: Int, answerUsed: Bool) -> Int {
+        if answerUsed { return 1 }
+        return 3 - (mistakes > 0 ? 1 : 0) - (hintsUsed > 0 ? 1 : 0)
+    }
+
     private init(_ number: Int, title: String, board: String, hand: String, plies: Int, answer: String,
                  lesson: String, review: String) {
         self.number = number

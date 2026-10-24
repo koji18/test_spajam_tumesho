@@ -148,6 +148,25 @@ struct GameTests {
         #expect(lesson.guideHandKind == nil)
     }
 
+    @Test func 入門の星_答えを見たら1つ_ミスとヒントでそれぞれ1つ減る() {
+        #expect(TutorialStage.stars(mistakes: 0, hintsUsed: 0, answerUsed: false) == 3)
+        #expect(TutorialStage.stars(mistakes: 2, hintsUsed: 0, answerUsed: false) == 2)
+        #expect(TutorialStage.stars(mistakes: 0, hintsUsed: 1, answerUsed: false) == 2)
+        #expect(TutorialStage.stars(mistakes: 1, hintsUsed: 2, answerUsed: false) == 1)
+        #expect(TutorialStage.stars(mistakes: 0, hintsUsed: 0, answerUsed: true) == 1)
+    }
+
+    @Test func 答えを見たことは_リセットしても残る() {
+        let game = Game(problem: tutorial)
+        game.answerOnDemand = true
+        play(Move(from: nil, to: Square.index(file: 1, rank: 5), kind: .gold), in: game)
+        game.showAnswer()
+        #expect(game.answerUsed)
+        game.reset()
+        #expect(game.answerUsed)
+        #expect(!game.answerShown)
+    }
+
     @Test func ヒントは2段まで_2段目で正解の行き先が光る() {
         let game = Game(problem: tutorial)
         game.showHint()
