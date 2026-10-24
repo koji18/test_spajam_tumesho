@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 詰んだときの演出。問題の列の上のレイヤーに出す（FeedView）。
+// 詰んだときの演出。問題の列の上のレイヤーに出す（FeedView）。文字は「詰」の一文字だけにする。
 // 動きはすべて表示されてからの経過時間 t（秒）で決める：
 //   0.00〜  白い閃光が消えていき、画面が揺れる
 //   0.00〜  光の筋が中央から広がり、ゆっくり回る。金の輪が 2 重に広がる
@@ -25,7 +25,7 @@ struct MateEffectView: View {
             // 動きを減らす設定のときは、動き終わったあとの姿だけを見せる
             let t = reduceMotion ? 1.5 : timeline.date.timeIntervalSince(start)
             GeometryReader { geo in
-                let size = geo.size
+                let area = geo.size
                 ZStack {
                     Color.black.opacity(0.85)
 
@@ -35,32 +35,9 @@ struct MateEffectView: View {
                         .opacity(min(1, t * 5))
                     Burst(seed: seed, t: t)
 
-                    VStack(spacing: 4) {
-                        Text("詰")
-                            .font(Theme.brush(min(size.width * 0.56, 230)))
-                            .foregroundStyle(Theme.goldGradient)
-                            .shadow(color: Theme.goldGlow, radius: 26)
-                            .shadow(color: .black.opacity(0.9), radius: 2, x: 3, y: 5)
-                            .scaleEffect(Self.spring(t, from: 2.4, to: 1))
-                            .rotationEffect(.degrees(Self.spring(t, from: -22, to: -4)))
-                        Text("正解")
-                            .font(Theme.brush(50))
-                            .foregroundStyle(Theme.cream)
-                            .shadow(color: Theme.goldGlow.opacity(0.8), radius: 10)
-                            .opacity(min(1, max(0, (t - 0.15) * 4)))
-                        Text("\(plies)手詰 / \(timeText)")
-                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Theme.cream.opacity(0.9))
-                            .opacity(min(1, max(0, (t - 0.25) * 4)))
-                        if let tesuji {
-                            Text("手筋「\(tesuji)」")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Theme.cream.opacity(0.85))
-                                .padding(.top, 6)
-                                .opacity(min(1, max(0, (t - 0.35) * 4)))
-                        }
-                    }
-                    .position(x: size.width / 2, y: size.height * Self.centerRatio + 70)
+                    // 光の筋と墨の中心にぴったり置く
+                    caption(t: t, width: area.width)
+                        .position(x: area.width / 2, y: area.height * Self.centerRatio)
 
                     VStack {
                         Spacer()
@@ -79,7 +56,7 @@ struct MateEffectView: View {
                     Color.white.opacity(max(0, 0.75 - t * 3.5))
                 }
                 .offset(Self.shake(t))
-                .frame(width: size.width, height: size.height)
+                .frame(width: area.width, height: area.height)
             }
         }
         .ignoresSafeArea()
@@ -91,7 +68,16 @@ struct MateEffectView: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    private var timeText: String { String(format: "%02d:%02d", seconds / 60, seconds % 60) }
+    // 「詰」の一文字だけを出す
+    private func caption(t: Double, width: CGFloat) -> some View {
+        Text("詰")
+            .font(Theme.brush(min(width * 0.56, 230)))
+            .foregroundStyle(Theme.goldGradient)
+            .shadow(color: Theme.goldGlow, radius: 26)
+            .shadow(color: .black.opacity(0.9), radius: 2, x: 3, y: 5)
+            .scaleEffect(Self.spring(t, from: 2.4, to: 1))
+            .rotationEffect(.degrees(Self.spring(t, from: -22, to: -4)))
+    }
 
     // from から to へ、行き過ぎて戻りながら収まる動き
     static func spring(_ t: Double, from: Double, to: Double) -> Double {
