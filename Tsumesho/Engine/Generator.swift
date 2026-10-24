@@ -12,6 +12,7 @@
 struct SplitMix64 {
     var state: UInt64
 
+    /// 次の 64 ビットの乱数を返す（SplitMix64）
     mutating func next() -> UInt64 {
         state &+= 0x9E37_79B9_7F4A_7C15
         var z = state
@@ -20,10 +21,12 @@ struct SplitMix64 {
         return z ^ (z >> 31)
     }
 
+    /// range の中の整数を一つ選ぶ
     mutating func int(_ range: ClosedRange<Int>) -> Int {
         range.lowerBound + Int(next() % UInt64(range.count))
     }
 
+    /// 配列から要素を一つ選ぶ
     mutating func pick<T>(_ xs: [T]) -> T { xs[int(0...xs.count - 1)] }
 }
 
@@ -31,6 +34,7 @@ struct ProblemGenerator {
     private var rng: SplitMix64
     private var seen = Set<String>()
 
+    /// 乱数の種を決めて作る。同じ種なら同じ順に問題ができる
     init(seed: UInt64) {
         rng = SplitMix64(state: seed)
     }
@@ -44,8 +48,8 @@ struct ProblemGenerator {
     private static let defenders: [Kind] = [.pawn, .silver, .gold, .lance, .knight]
     private static let handLetters = ["G", "G", "S", "R", "B", "N", "P"]
 
-    // 条件を満たす問題が見つかるまで局面を作る。maxTries 回で見つからなければ nil。
-    // allowDrop が false なら、正解が持ち駒を打つ手の問題は採らない（正解が金打ばかりにならないように）
+    /// 条件を満たす問題が見つかるまで局面を作る。maxTries 回で見つからなければ nil。
+    /// allowDrop が false なら、正解が持ち駒を打つ手の問題は採らない（正解が金打ばかりにならないように）
     mutating func next(size: BoardSize, plies: Int, maxPieces: Int, allowDrop: Bool = true,
                        maxTries: Int = 200_000) -> Problem? {
         for _ in 0..<maxTries {
@@ -58,7 +62,7 @@ struct ProblemGenerator {
         return nil
     }
 
-    // 問題の条件を満たしていれば Problem を返す（id は 0。使う側で振る）
+    /// 問題の条件を満たしていれば Problem を返す（id は 0。使う側で振る）
     static func evaluate(_ pos: Position, size: BoardSize, plies: Int) -> Problem? {
         if pos.inCheck(.white) { return nil }
         if pos.checkMoves().count < 3 { return nil }  // 王手の候補が少なすぎると簡単すぎる
@@ -66,7 +70,7 @@ struct ProblemGenerator {
         let answers = pos.mateMoves(plies: plies)
         guard answers.count == 1 else { return nil }  // 正解の初手は一つだけ
         let occupied = pos.board.indices.filter { pos.board[$0] != nil }
-        // 盤より小さい範囲で遊ぶときは、駒がすべて範囲に入り、範囲の中だけで指しても正解が同じ
+        /// 盤より小さい範囲で遊ぶときは、駒がすべて範囲に入り、範囲の中だけで指しても正解が同じ
         var filter: ((Move) -> Bool)?
         if size.span < 9 {
             let span = size.span
@@ -82,15 +86,17 @@ struct ProblemGenerator {
                        answer: Notation.label(answers[0], in: pos))
     }
 
-    // 3 手詰めで、玉方がいちばん粘る応手をしたあと、詰ませる最終手も一つだけか
+    /// 3 手詰めで、玉方がいちばん粘る応手をしたあと、詰ませる最終手も一つだけか
     private static func hasUniqueLastMove(_ pos: Position, _ first: Move, where filter: ((Move) -> Bool)?) -> Bool {
         let next = pos.playing(first)
         guard let reply = next.bestDefense(plies: 1, where: filter) else { return false }
         return next.playing(reply).mateMoves(plies: 1, where: filter).count == 1
     }
 
+    /// 盤の大きさに合わせて駒をランダムに置いた局面を作る。置けなかったり反則の配置になったりしたら nil
     private mutating func randomPosition(_ size: BoardSize) -> Position? {
         var pos = Position()
+        /// 空いているマスに駒を置く。20 回試して置けなければ false
         func place(_ p: Piece, files: ClosedRange<Int>, ranks: ClosedRange<Int>) -> Bool {
             for _ in 0..<20 {
                 let i = Square.index(file: rng.int(files), rank: rng.int(ranks))
@@ -98,7 +104,7 @@ struct ProblemGenerator {
             }
             return false
         }
-        // 行き所のない駒にならない、いちばん上の段
+        /// 行き所のない駒にならない、いちばん上の段
         func minRank(_ p: Piece) -> Int {
             if p.promoted { return 1 }
             switch p.kind {
@@ -109,11 +115,11 @@ struct ProblemGenerator {
         }
         let isLongRange: (Piece) -> Bool = { [.rook, .bishop, .lance].contains($0.kind) }
 
-        // 玉は 5×5・7×7 では一〜二段、9×9 では一〜三段。
-        // 玉方の駒は玉の左右 2 筋の、5×5・7×7 では三段まで、9×9 では玉の 1 段下まで。
-        // 攻め方の駒は玉の左右 2 筋の、5×5 では五段まで、7×7 では六段まで、9×9 では玉の 3 段下まで。
-        // ただし 7×7・9×9 では、飛・角・香（成った駒も）を表示範囲のどこにでも置く
-        // 5×5・7×7 では、玉を表示範囲の右上の隅に置く。左端の筋には置かず、3 手詰めで玉が逃げても範囲の外に出ないようにする
+        /// 玉は 5×5・7×7 では一〜二段、9×9 では一〜三段。
+        /// 玉方の駒は玉の左右 2 筋の、5×5・7×7 では三段まで、9×9 では玉の 1 段下まで。
+        /// 攻め方の駒は玉の左右 2 筋の、5×5 では五段まで、7×7 では六段まで、9×9 では玉の 3 段下まで。
+        /// ただし 7×7・9×9 では、飛・角・香（成った駒も）を表示範囲のどこにでも置く
+        /// 5×5・7×7 では、玉を表示範囲の右上の隅に置く。左端の筋には置かず、3 手詰めで玉が逃げても範囲の外に出ないようにする
         let kingFile = size == .full ? rng.int(1...9) : rng.int(1...(size.span - 1))
         let kingRank = size == .full ? rng.int(1...3) : rng.int(1...2)
         guard place(Piece(side: .white, kind: .king), files: kingFile...kingFile, ranks: kingRank...kingRank) else { return nil }

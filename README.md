@@ -36,6 +36,22 @@ open Tsumesho.xcodeproj
 
 `Tsumesho.xcodeproj` は git に入れていません。`project.yml` から各自が生成します。ファイルを足したり設定を変えたりしたら、`project.yml` を直して `xcodegen generate` を実行してください。Xcode の画面で変えた設定は、次に生成し直すと消えます。`git pull` のあとも `xcodegen generate` を実行してください。
 
+### 正解演出の試作
+
+駒の移動と着地、3・5・10連勝で変わる振動、スコアへ飛ぶ金色の粒、昇段バッジ、最後の一手から広がる Metal の波紋を追加しています。
+問題画面の歯車 →「設定」→「演出を試す」で、成績を変えずに連勝・昇段・スコア獲得の演出を確認できます。
+振動のオン・オフと効果音の音量を設定できます。効果音はマナーモードを尊重し、振動の確認には対応する実機の iPhone が必要です。「視差効果を減らす」がオンの場合は、移動・波紋・粒・バッジ回転を抑えます。
+
+`missing Metal Toolchain` と出た場合は、Xcode 公式の追加コンポーネントを一度インストールしてください。
+
+```sh
+xcodebuild -downloadComponent MetalToolchain
+```
+
+Python で生成した仮の効果音と生成スクリプトは削除しています。効果音は main 由来の詰み音と選択音を使用します。
+
+ネオンの背景と段位バッジは iPhone の傾きに反応します。アプリを開いたときの持ち方を基準に、左右・前後へ20度ほど傾けると光と反射が動きます。昇段プレビューの大きなバッジも反応します。「視差効果を減らす」がオンの場合とバックグラウンドではセンサーを停止します。
+
 ビルド設定は2つのファイルに分けています。
 
 - `Config/Base.xcconfig`：全員共通の値（git に入れる）
@@ -83,6 +99,7 @@ Tsumesho/
   Theme.swift             色とフォント
   TsumeshoApp.swift       最初の画面と、縦スワイプのフィードの切り替え
   Views/                  画面（最初の画面・問題・盤）
+TsumeshoTests/            アプリ側の単体テスト（Swift Testing）
 Tools/
   test.sh                 エンジンと問題の生成のテスト
 Config/
@@ -108,6 +125,17 @@ Tools/test.sh
 - 9×9 用の問題は、5×5 の範囲の外にも駒がある（盤の広さを使っている）
 
 Mac の Swift だけで動くので、Xcode やシミュレーターは要りません。
+
+### 単体テスト（アプリ側）
+
+スコアの計算、タイムトライアルの加算と減算、レーティングと保存、1 問の遊びの流れ（駒を選ぶ・正解・不正解・ヒント・3 手詰めの応手）を `TsumeshoTests/` で確かめます。Xcode で ⌘U を押すか、次のコマンドで動かします。
+
+```sh
+xcodebuild test -project Tsumesho.xcodeproj -scheme Tsumesho \
+  -destination "platform=iOS Simulator,name=<シミュレーターの名前>"
+```
+
+成績を保存するテストは、テスト専用の保存先を使うので、手元のアプリの成績は書き換えません。
 
 ## 問題の作り方
 

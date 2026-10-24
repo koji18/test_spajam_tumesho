@@ -50,12 +50,12 @@ struct IntroPage: View {
             Spacer()
             // 遊び方と駒の動きは、並べた 2 枚の木札から開く
             VStack(alignment: .trailing, spacing: 8) {
-                Button { showsRules = true } label: {
+                Button { Sound.playPick(volume: session.soundVolume); showsRules = true } label: {
                     FudaTag(text: "遊び方", selected: false, fontSize: 13)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("遊び方")
-                Button { showsPieces = true } label: {
+                Button { Sound.playPick(volume: session.soundVolume); showsPieces = true } label: {
                     FudaTag(text: "駒の動き", selected: false, fontSize: 13)
                 }
                 .buttonStyle(.plain)
@@ -253,6 +253,7 @@ struct IntroPage: View {
     private func tab(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button {
             if session.hapticsOn { UISelectionFeedbackGenerator().selectionChanged() }
+            Sound.playPick(volume: session.soundVolume)
             action()
         } label: {
             FudaTag(text: text, selected: selected)
@@ -298,6 +299,7 @@ struct IntroPage: View {
     // 駒を持ち上げて、盤に叩きつけてから始める。朱の輪が広がり、画面が揺れる
     private func slamAndStart() {
         guard slam == 0 else { return }
+        Sound.playPick(volume: session.soundVolume)
         Task {
             if session.hapticsOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             withAnimation(.easeOut(duration: 0.12)) { slam = 1 }

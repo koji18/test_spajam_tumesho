@@ -78,6 +78,11 @@ struct KomaView: View {
 struct BoardView: View {
     let game: Game
     @Environment(\.palette) private var palette
+    @Environment(Session.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var moving: Move?
+    @State private var lastPresentedMove: Move?
+    @State private var rippleStartedAt: Date?
 
     var body: some View {
         let files = Array(game.visibleFiles.reversed())  // 左から ９ ８ … １（5×5 では切り出した 5 筋）
@@ -125,10 +130,52 @@ struct BoardView: View {
                         .fixedSize()
                         .position(x: gridWidth + labelSize / 2, y: labelSize + (CGFloat(j) + 0.5) * cell)
                 }
+
+                if let move = moving, let piece = game.position.board[move.to], !reduceMotion {
+                    let target = point(for: move.to, files: files, ranks: ranks, cell: cell)
+                    let source = move.from.map { point(for: $0, files: files, ranks: ranks, cell: cell) }
+                        ?? CGPoint(x: target.x, y: target.y + cell * 0.9)
+                    LandingKoma(piece: piece, source: source, target: target, cell: cell)
+                        .id(move)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .modifier(MateRippleEffect(
+                origin: game.lastMove.map { point(for: $0.to, files: files, ranks: ranks, cell: cell) } ?? .zero,
+                startedAt: rippleStartedAt, reduceMotion: reduceMotion))
         }
         .aspectRatio(1, contentMode: .fit)
+        .modifier(ShakeEffect(animatableData: reduceMotion ? 0 : CGFloat(game.mistakes)))
+        .animation(.linear(duration: 0.4), value: game.mistakes)
+        .task(id: game.lastMove) {
+            rippleStartedAt = nil
+            guard let move = game.lastMove else {
+                moving = nil
+                lastPresentedMove = nil
+                return
+            }
+            guard move != lastPresentedMove else { return }
+            lastPresentedMove = move
+            moving = move
+            do {
+                if !reduceMotion { try await Task.sleep(for: .milliseconds(180)) }
+                try Task.checkCancellation()
+                Haptics.play(.landing, enabled: session.hapticsOn)
+                if case .solved = game.status, !reduceMotion { rippleStartedAt = Date() }
+                try await Task.sleep(for: .milliseconds(180))
+                moving = nil
+                try await Task.sleep(for: .milliseconds(720))
+                rippleStartedAt = nil
+            } catch { }
+        }
+        .onDisappear { moving = nil; rippleStartedAt = nil }
+    }
+
+    private func point(for square: Int, files: [Int], ranks: [Int], cell: CGFloat) -> CGPoint {
+        CGPoint(x: (CGFloat(files.firstIndex(of: Square.file(square)) ?? 0) + 0.5) * cell,
+                y: 18 + (CGFloat(ranks.firstIndex(of: Square.rank(square)) ?? 0) + 0.5) * cell)
     }
 
     // 盤の外枠の光る線
@@ -164,6 +211,7 @@ struct BoardView: View {
         let isHintSource = game.hintSources.contains(i)
         let isHintTarget = game.hintTargets.contains(i)
         let isRevealed = game.revealedAnswer.map { $0.from == i || $0.to == i } ?? false
+        let isRefutation = game.refutation.map { $0.from == i || $0.to == i } ?? false
 
         Button {
             game.tap(square: i)
@@ -183,14 +231,22 @@ struct BoardView: View {
                 if isHintSource || isHintTarget {
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.hint, lineWidth: 3).padding(2)
                 }
+                if isRefutation {
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.neonPink.opacity(0.25)).padding(2)
+                    RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.neonPink, lineWidth: 3).padding(2)
+                        .shadow(color: Theme.neonPink.opacity(palette.glow), radius: 5)
+                }
                 if isRevealed {
                     RoundedRectangle(cornerRadius: 4).fill(Theme.ok.opacity(0.35)).padding(2)
                     RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ok, lineWidth: 3).padding(2)
                 }
-                if let piece {
+                if let piece, moving?.to != i || reduceMotion {
                     KomaView(label: Notation.label(piece), promoted: piece.promoted,
                              upsideDown: piece.side == .white, size: size,
                              tone: piece.side == .white ? .defender : .attacker)
+                        .scaleEffect(isSelected && !reduceMotion ? 1.13 : 1)
+                        .offset(y: isSelected && !reduceMotion ? -4 : 0)
+                        .animation(.spring(duration: 0.2), value: isSelected)
                 }
             }
             .frame(width: size, height: size)
@@ -204,5 +260,68 @@ struct BoardView: View {
         let at = Notation.fileLabel(Square.file(i)) + Notation.rankLabel(Square.rank(i))
         guard let piece else { return at }
         return at + (piece.side == .white ? "　玉方の" : "　") + Notation.label(piece)
+    }
+}
+
+private struct LandingKoma: View {
+    let piece: Piece
+    let source: CGPoint
+    let target: CGPoint
+    let cell: CGFloat
+
+    private struct Motion {
+        var progress: CGFloat = 0
+        var scale: CGFloat = 1.12
+        var lift: CGFloat = -8
+    }
+
+    var body: some View {
+        KomaView(label: Notation.label(piece), promoted: piece.promoted,
+                 upsideDown: piece.side == .white, size: cell,
+                 tone: piece.side == .white ? .defender : .attacker)
+            .keyframeAnimator(initialValue: Motion(), repeating: false) { content, motion in
+                content
+                    .scaleEffect(motion.scale)
+                    .position(x: source.x + (target.x - source.x) * motion.progress,
+                              y: source.y + (target.y - source.y) * motion.progress + motion.lift)
+            } keyframes: { _ in
+                KeyframeTrack(\.progress) { CubicKeyframe(1, duration: 0.18) }
+                KeyframeTrack(\.lift) {
+                    CubicKeyframe(0, duration: 0.18)
+                    SpringKeyframe(-3, duration: 0.07)
+                    SpringKeyframe(0, duration: 0.11)
+                }
+                KeyframeTrack(\.scale) {
+                    CubicKeyframe(0.9, duration: 0.18)
+                    SpringKeyframe(1, duration: 0.18)
+                }
+            }
+    }
+}
+
+private struct MateRippleEffect: ViewModifier {
+    let origin: CGPoint
+    let startedAt: Date?
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        TimelineView(.animation(paused: startedAt == nil || reduceMotion)) { context in
+            let elapsed = startedAt.map { max(0, context.date.timeIntervalSince($0)) } ?? 0
+            content.layerEffect(
+                ShaderLibrary.mateRipple(.float2(origin), .float(Float(elapsed))),
+                maxSampleOffset: CGSize(width: 16, height: 16),
+                isEnabled: startedAt != nil && elapsed < 0.9 && !reduceMotion)
+        }
+    }
+}
+
+/// 盤を左右に揺らす動き。animatableData が 1 増えるあいだに 3 往復する
+struct ShakeEffect: GeometryEffect {
+    var animatableData: CGFloat
+
+    /// 揺れの横ずれ。往復の真ん中ほど大きく、始めと終わりは 0
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let x = 9 * sin(animatableData * .pi * 6)
+        return ProjectionTransform(CGAffineTransform(translationX: x, y: 0))
     }
 }
