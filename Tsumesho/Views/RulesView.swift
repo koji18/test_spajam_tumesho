@@ -387,7 +387,8 @@ private struct HintIllustration: View {
 private struct ScoreIllustration: View {
     @State private var streak = 1
 
-    private var multiplier: Double { min(3, 1 + 0.1 * Double(streak - 1)) }
+    /// 実際のスコアと同じ式で求める（Score.swift）。式を変えたときに、説明と食い違わないように
+    private var multiplier: Double { ScoreGain.streakMultiplier(for: streak) }
 
     var body: some View {
         VStack(spacing: 16) {
