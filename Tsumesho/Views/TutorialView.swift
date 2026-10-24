@@ -255,7 +255,8 @@ private struct StagePage: View {
 
     // 解けた瞬間の、少しだけ派手な演出。盤の上に朱の落款が押され、紙吹雪が舞う
     private func celebrate() {
-        burstStart = Date()
+        let start = Date()
+        burstStart = start
         sealOpacity = 1
         sealScale = 2.4
         withAnimation(.spring(response: 0.22, dampingFraction: 0.5)) { sealScale = 1 }
@@ -267,6 +268,9 @@ private struct StagePage: View {
             }
             try? await Task.sleep(for: .milliseconds(700))
             withAnimation(.easeIn(duration: 0.25)) { sealOpacity = 0 }
+            // 紙吹雪が消えたら（約 3.1 秒）止める。止めないと、解いた段の盤が毎フレーム描き直し続ける
+            try? await Task.sleep(for: .milliseconds(2200))
+            if burstStart == start { burstStart = nil }
         }
     }
 
