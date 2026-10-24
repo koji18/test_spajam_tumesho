@@ -192,7 +192,11 @@ struct ProblemPage: View {
         return Button {
             game.tap(hand: item.kind)
         } label: {
+            // 選んだ持ち駒は少し大きくして浮かせる
             KomaView(label: Notation.label(item.kind), size: 46, tone: .hand)
+                .scaleEffect(selected ? 1.1 : 1)
+                .offset(y: selected ? -3 : 0)
+                .animation(.spring(duration: 0.25, bounce: 0.45), value: selected)
                 .frame(width: 60, height: 60)
                 .background(RoundedRectangle(cornerRadius: 12).fill(palette.panel))
                 .overlay(

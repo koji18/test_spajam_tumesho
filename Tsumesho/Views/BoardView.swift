@@ -257,8 +257,12 @@ struct BoardView: View {
                 }
                 // 動いている途中の駒は、分身が着くまで隠す
                 if let piece, flight?.move.to != i {
+                    // 選んだ駒は少し大きくして浮かせ、影を落として持ち上げたように見せる
                     koma(piece, size: size)
-                        .scaleEffect(droppedSquare == i ? 1.45 : 1)
+                        .scaleEffect(droppedSquare == i ? 1.45 : (isSelected ? 1.14 : 1))
+                        .offset(y: isSelected ? -size * 0.08 : 0)
+                        .shadow(color: .black.opacity(isSelected ? 0.5 : 0), radius: isSelected ? 4 : 0, y: isSelected ? 5 : 0)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.45), value: isSelected)
                 }
             }
             .frame(width: size, height: size)
