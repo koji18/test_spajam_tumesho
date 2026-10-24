@@ -24,12 +24,20 @@ cd ~/ghq/github.com/koji18/test_spajam_tumesho
 sudo xcode-select -s /Applications/Xcode.app
 sudo xcodebuild -license accept
 
+# 初回だけ：自分用のビルド設定を作る（中身は「iPhone に入れる」で書く）
+cp Config/Local.xcconfig.example Config/Local.xcconfig
+
 # Xcode のプロジェクトを生成して開く
 xcodegen generate
 open Tsumesho.xcodeproj
 ```
 
-`Tsumesho.xcodeproj` は `project.yml` から生成します。ファイルを足したり設定を変えたりしたら、`project.yml` を直して `xcodegen generate` を実行してください。Xcode の画面で変えた設定は、次に生成し直すと消えます。
+`Tsumesho.xcodeproj` は git に入れていません。`project.yml` から各自が生成します。ファイルを足したり設定を変えたりしたら、`project.yml` を直して `xcodegen generate` を実行してください。Xcode の画面で変えた設定は、次に生成し直すと消えます。`git pull` のあとも `xcodegen generate` を実行してください。
+
+ビルド設定は2つのファイルに分けています。
+
+- `Config/Base.xcconfig`：全員共通の値（git に入れる）
+- `Config/Local.xcconfig`：Team ID など人ごとに違う値（git に入れない）。`Base.xcconfig` の値を上書きします
 
 ## iPhone に入れる
 
@@ -37,9 +45,10 @@ open Tsumesho.xcodeproj
 
 1. Xcode で TARGETS の「Tsumesho」→「Signing & Capabilities」を開く
 2. 「Team」で「Add Account…」から自分の Apple ID でサインインし、「（自分の名前）(Personal Team)」を選ぶ
-3. `project.yml` の `DEVELOPMENT_TEAM` を自分の Team ID に書き換える（Team ID は、手順 2 のあと Build Settings の「Development Team」で確認できます）
-   - 「Bundle ID がすでに使われています」と出たら、`PRODUCT_BUNDLE_IDENTIFIER` を自分用のもの（例 `com.自分の名前.tsumesho`）に変える
-4. iPhone を USB でつなぎ、Xcode の上部で iPhone を選んで ▶ で実行する
+3. 手順 2 のあと、Build Settings の「Development Team」に出る10桁の Team ID を、`Config/Local.xcconfig` の `DEVELOPMENT_TEAM` に書く
+   - 「Bundle ID がすでに使われています」と出たら、同じファイルに `PRODUCT_BUNDLE_IDENTIFIER = com.自分の名前.tsumesho` のように自分用の ID を書く
+4. `xcodegen generate` を実行し直す（手順 2 で Xcode の画面から選んだ Team は、ここで消えて `Local.xcconfig` の値に置き換わります）
+5. iPhone を USB でつなぎ、Xcode の上部で iPhone を選んで ▶ で実行する
 
 ### iPhone 側（初回だけ）
 
@@ -73,6 +82,9 @@ Tsumesho/
 Tools/
   test.sh                 エンジンと全問題のテスト
   gen-problems.sh         問題の自動生成
+Config/
+  Base.xcconfig           全員共通のビルド設定（Bundle ID など）
+  Local.xcconfig.example  人ごとの設定のひな形。Local.xcconfig にコピーして使う
 project.yml               XcodeGen の設定
 ```
 

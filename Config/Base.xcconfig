@@ -1,0 +1,7 @@
+// 全員共通のビルド設定。project.yml から読み込む。
+// 人ごとに違う値（Team ID など）は Local.xcconfig に書く。Local.xcconfig は git に入れない。
+
+PRODUCT_BUNDLE_IDENTIFIER = com.kkariya.tsumesho
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"
