@@ -7,6 +7,7 @@ struct IntroPage: View {
     let onStart: () -> Void
     @Environment(Session.self) private var session
     @State private var showsRules = false
+    @State private var showsPieces = false
     @State private var bob = false
     @State private var progress = 0.0
     @State private var slam = 0
@@ -33,6 +34,7 @@ struct IntroPage: View {
         .background(PaperBackground())
         .environment(\.palette, .classic)
         .sheet(isPresented: $showsRules) { RulesSheet() }
+        .sheet(isPresented: $showsPieces) { PieceGuideSheet() }
         .offset(y: pageBump)
         .onAppear {
             withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { bob = true }
@@ -46,11 +48,19 @@ struct IntroPage: View {
         HStack(alignment: .top) {
             plaque
             Spacer()
-            Button { showsRules = true } label: {
-                FudaTag(text: "遊び方", selected: false, fontSize: 13)
+            // 遊び方と駒の動きは、並べた 2 枚の木札から開く
+            VStack(alignment: .trailing, spacing: 8) {
+                Button { showsRules = true } label: {
+                    FudaTag(text: "遊び方", selected: false, fontSize: 13)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("遊び方")
+                Button { showsPieces = true } label: {
+                    FudaTag(text: "駒の動き", selected: false, fontSize: 13)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("駒の動き")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("遊び方")
         }
     }
 
