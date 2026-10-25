@@ -58,6 +58,8 @@ struct RankUpView: View {
     @State private var startedAt = Date()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var promotionTitle: String { reward.rank.hasSuffix("級") ? "昇級" : "昇段" }
+
     var body: some View {
         TimelineView(.animation(paused: reduceMotion)) { context in
             let t = reduceMotion ? 1 : max(0, context.date.timeIntervalSince(startedAt))
@@ -68,7 +70,7 @@ struct RankUpView: View {
                     .frame(width: 180, height: 180)
                     .scaleEffect(reduceMotion ? 1 : 0.6 + t * 1.4)
                 VStack(spacing: 22) {
-                    Text("昇段")
+                    Text(promotionTitle)
                         .font(.system(size: 28, weight: .heavy))
                         .tracking(8)
                         .foregroundStyle(Theme.goldGlow)
@@ -84,7 +86,7 @@ struct RankUpView: View {
         }
         .ignoresSafeArea()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("昇段。\(rankName(reward.rank))になりました")
+        .accessibilityLabel("\(promotionTitle)。\(rankName(reward.rank))になりました")
         .accessibilityAddTraits(.isModal)
     }
 
@@ -108,6 +110,9 @@ struct FeedbackPreviewView: View {
                 }
             }
             Section {
+                Button("昇級とスコア獲得") {
+                    preview(streak: 5, rankUp: true, previousRank: "10級", nextRank: "9級")
+                }
                 Button("昇段とスコア獲得") { preview(streak: 5, rankUp: true) }
             } footer: {
                 Text("この画面のプレビューでは成績は変わりません。音と振動は設定に従います。")
@@ -147,10 +152,11 @@ struct FeedbackPreviewView: View {
         }
     }
 
-    private func preview(streak: Int, rankUp: Bool) {
+    private func preview(streak: Int, rankUp: Bool, previousRank: String = "初", nextRank: String = "二") {
         previewTask?.cancel()
         let gain = ScoreGain.make(plies: 3, size: .full, seconds: 8, hintsUsed: 0, streak: streak)
-        let item = SolveReward(gain: gain, streak: streak, previousRank: "初", rank: rankUp ? "二" : "初")
+        let item = SolveReward(gain: gain, streak: streak, previousRank: previousRank,
+                               rank: rankUp ? nextRank : previousRank)
         reward = item
         Haptics.play(rankUp ? .rankUp : .mate(streak), enabled: session.hapticsOn)
         if !rankUp { Sound.playMate(volume: session.soundVolume, streak: streak) }

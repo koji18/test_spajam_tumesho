@@ -32,6 +32,9 @@ struct HolographicBadge: View {
             Text(title)
                 .font(.system(size: size * (celebrating ? 0.49 : 0.39), weight: .heavy,
                               design: celebrating ? .serif : .default))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, size * 0.13)
                 .foregroundStyle(neon ? Theme.cream : palette.text)
                 .shadow(color: .black.opacity(neon ? 0.55 : 0), radius: 2, y: 1)
         }
