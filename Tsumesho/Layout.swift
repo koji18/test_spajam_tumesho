@@ -19,7 +19,7 @@ struct PageLayout {
     var counter: CGFloat { compact ? 24 : 30 }
     var handTile: CGFloat { compact ? 50 : 60 }
     var handPiece: CGFloat { compact ? 38 : 46 }
-    var handRowHeight: CGFloat { compact ? 64 : 78 }
+    var handRowHeight: CGFloat { compact ? 52 : 64 }
     var badge: CGFloat { compact ? 38 : 46 }
     var rating: CGFloat { compact ? 24 : 30 }
     var score: CGFloat { compact ? 18 : 22 }
