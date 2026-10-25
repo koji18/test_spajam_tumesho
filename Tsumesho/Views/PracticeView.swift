@@ -50,7 +50,8 @@ struct PracticeView: View {
             .id(round)
         }
         .scrollPosition(id: $current)
-        .scrollTargetBehavior(.paging)
+        // 入門と同じく、ページの上端にそろえて止める（.paging だと下の安全領域の分だけずれがたまる）
+        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollIndicators(.hidden)
         .clipped()
     }
