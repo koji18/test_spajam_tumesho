@@ -327,3 +327,42 @@ private struct PieceMoveBoard: View {
         return result
     }
 }
+
+// 持ち駒を選んだとき、手元に出す小さな動きの図。盤と同じ木目と線で、真ん中が駒、光るマスが動けるところ
+struct MiniMoveRange: View {
+    @Environment(\.palette) private var palette
+    let kind: Kind
+    var cell: CGFloat = 15
+
+    private let span = 5
+
+    var body: some View {
+        let targets = PieceMoveBoard.targets(kind: kind, promoted: false, span: span)
+        let side = cell * CGFloat(span)
+        ZStack(alignment: .topLeading) {
+            Rectangle().fill(palette.boardFill)
+            ForEach(Array(targets.enumerated()), id: \.offset) { _, t in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(palette.target.opacity(palette.plain ? 0.6 : 0.4))
+                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(palette.target, lineWidth: 1))
+                    .shadow(color: palette.target.opacity(palette.glow * 0.8), radius: 3)
+                    .frame(width: cell - 2, height: cell - 2)
+                    .position(x: cell * (CGFloat(t.col) + 0.5), y: cell * (CGFloat(t.row) + 0.5))
+            }
+            Path { p in
+                for i in 0...span {
+                    let v = cell * CGFloat(i)
+                    p.move(to: CGPoint(x: v, y: 0)); p.addLine(to: CGPoint(x: v, y: side))
+                    p.move(to: CGPoint(x: 0, y: v)); p.addLine(to: CGPoint(x: side, y: v))
+                }
+            }
+            .stroke(palette.gridLine, lineWidth: 0.7)
+            KomaView(label: Notation.label(Piece(side: .black, kind: kind, promoted: false)), size: cell * 1.05, tone: .attacker)
+                .position(x: cell * 2.5, y: cell * 2.5)
+        }
+        .frame(width: side, height: side)
+        .overlay(Rectangle().stroke(palette.boardEdge, lineWidth: 1.5))
+        .shadow(color: .black.opacity(palette.plain ? 0.25 : 0), radius: 3, y: 2)
+        .accessibilityLabel("\(Notation.label(Piece(side: .black, kind: kind, promoted: false)))の動ける範囲")
+    }
+}

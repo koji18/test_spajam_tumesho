@@ -206,6 +206,12 @@ struct ProblemPage: View {
             Spacer(minLength: 0)
         }
         .frame(minHeight: layout.handRowHeight)
+        // 選んだ持ち駒の動ける範囲。右の空きスペースに重ねるだけで、段の大きさは変えない
+        .overlay(alignment: .trailing) {
+            if case .hand(let kind) = game.selection {
+                MiniMoveRange(kind: kind, cell: layout.compact ? 10 : 12)
+            }
+        }
     }
 
     /// 持ち駒の 1 枚ぶんのタイル
