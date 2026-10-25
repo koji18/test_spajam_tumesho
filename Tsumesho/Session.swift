@@ -31,6 +31,7 @@ enum PlayMode: String {
 @MainActor @Observable
 final class Session {
     private let store: UserDefaults
+    private static let initialRating = 0
     /// ノーマルでミスした問題。修行モードで解き直す
     let practice: PracticeLibrary
 
@@ -84,7 +85,13 @@ final class Session {
         soundVolume = store.object(forKey: "soundVolume") as? Double ?? 0.8
         musicVolume = store.object(forKey: "musicVolume") as? Double ?? 0.6
         tutorialCleared = store.bool(forKey: "tutorialCleared")
-        rating = store.object(forKey: "rating") as? Int ?? 1500
+        let savedRating = store.object(forKey: "rating") as? Int
+        // 旧版の開始点1500だけを一度差し引き、獲得した分は10級から引き継ぐ。
+        if let savedRating, !store.bool(forKey: "ratingStartsAtTenKyu") {
+            rating = max(Self.initialRating, savedRating - 1500)
+        } else {
+            rating = savedRating ?? Self.initialRating
+        }
         streak = store.integer(forKey: "streak")
         bestStreak = store.integer(forKey: "bestStreak")
         solvedTotal = store.integer(forKey: "solvedTotal")
@@ -92,6 +99,8 @@ final class Session {
         let score = store.integer(forKey: "totalScore")
         totalScore = score
         displayedScore = score
+        store.set(rating, forKey: "rating")
+        store.set(true, forKey: "ratingStartsAtTenKyu")
     }
 
     /// 設定の「記録をすべて消す」。成績・入門の星・修行の問題・設定を消し、はじめて起動したときと同じにする。
@@ -105,7 +114,7 @@ final class Session {
         musicVolume = 0.6
         tutorialCleared = false
         tutorialStars = Array(repeating: 0, count: TutorialStage.all.count)
-        rating = 1500
+        rating = Self.initialRating
         streak = 0
         bestStreak = 0
         solvedTotal = 0
@@ -174,29 +183,44 @@ final class Session {
 
     /// 段位。レーティングが lowerBound 以上になると、その段位になる
     struct Rank: Equatable {
-        let badge: String     // バッジの一文字（級・初・二…）
+        let badge: String     // バッジの表記（10級・9級…初・二…八）
         let lowerBound: Int
 
-        /// 段位の名前（級位・初段・二段…）
+        /// 級・段の名前（10級・9級…初段・二段…八段）
         var name: String { Rank.name(ofBadge: badge) }
 
-        /// バッジの一文字から段位の名前を作る
-        static func name(ofBadge badge: String) -> String { badge == "級" ? "級位" : "\(badge)段" }
+        /// 級の表記はそのまま、段の表記には「段」を付ける。
+        static func name(ofBadge badge: String) -> String {
+            if badge == "級" { return "級位" }
+            return badge.hasSuffix("級") ? badge : "\(badge)段"
+        }
     }
 
-    /// 段位の一覧。段位の境目と名前は、ここだけで決める。級位の lowerBound は、ホームのゲージの起点
+    /// 10級〜八段の18段階。既存の初段〜五段の境界を保ち、段位・ゲージ・昇級段の表示で共有する。
     static let ranks: [Rank] = [
-        Rank(badge: "級", lowerBound: 1200),
+        Rank(badge: "10級", lowerBound: 0),
+        Rank(badge: "9級", lowerBound: 500),
+        Rank(badge: "8級", lowerBound: 600),
+        Rank(badge: "7級", lowerBound: 700),
+        Rank(badge: "6級", lowerBound: 800),
+        Rank(badge: "5級", lowerBound: 900),
+        Rank(badge: "4級", lowerBound: 1000),
+        Rank(badge: "3級", lowerBound: 1100),
+        Rank(badge: "2級", lowerBound: 1200),
+        Rank(badge: "1級", lowerBound: 1300),
         Rank(badge: "初", lowerBound: 1400),
         Rank(badge: "二", lowerBound: 1600),
         Rank(badge: "三", lowerBound: 1800),
         Rank(badge: "四", lowerBound: 2000),
         Rank(badge: "五", lowerBound: 2200),
+        Rank(badge: "六", lowerBound: 2400),
+        Rank(badge: "七", lowerBound: 2600),
+        Rank(badge: "八", lowerBound: 2800),
     ]
 
     /// rating のときの段位
     static func rank(for rating: Int) -> Rank {
-        ranks.last { rating >= $0.lowerBound && $0.badge != "級" } ?? ranks[0]
+        ranks.last { rating >= $0.lowerBound } ?? ranks[0]
     }
 
     /// 次の段位と、そこまでの進み具合（0〜1）と、あと何点か。最高段なら nil
