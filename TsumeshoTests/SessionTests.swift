@@ -9,7 +9,7 @@ struct SessionTests {
 
     @Test func 初めて起動したときの値() {
         let session = Session(store: store)
-        #expect(session.rating == 0)
+        #expect(session.rating == 400)
         #expect(session.rankName == "10級")
         #expect(session.boardSize == .full)
         #expect(session.mode == .tutorial)  // はじめて起動した人は入門から始める
@@ -32,7 +32,7 @@ struct SessionTests {
         // 次に起動したときも、消したままになっている
         let restarted = Session(store: store)
         for s in [session, restarted] {
-            #expect(s.rating == 0)
+            #expect(s.rating == 400)
             #expect(s.rankName == "10級")
             #expect(s.totalScore == 0 && s.displayedScore == 0)
             #expect(s.streak == 0 && s.bestStreak == 0 && s.solvedTotal == 0 && s.timeTrialBest == 0)
@@ -49,16 +49,16 @@ struct SessionTests {
         let gain = session.recordSolve(plies: 1, size: .small, seconds: 0, hintsUsed: 0)
         #expect(session.streak == 1)
         #expect(session.solvedTotal == 1)
-        #expect(session.rating == 12)
+        #expect(session.rating == 412)
         #expect(session.totalScore == gain.points)
     }
 
     @Test func 三手詰めはレーティングが20上がり_ヒントで減る() {
         let session = Session(store: store)
         session.recordSolve(plies: 3, size: .small, seconds: 0, hintsUsed: 0)
-        #expect(session.rating == 20)
+        #expect(session.rating == 420)
         session.recordSolve(plies: 1, size: .small, seconds: 0, hintsUsed: 3)
-        #expect(session.rating == 22)  // 12 - 15 は最低の +2 になる
+        #expect(session.rating == 422)  // 12 - 15 は最低の +2 になる
     }
 
     @Test func 間違えると連勝が0に戻りレーティングが10下がる() {
@@ -68,7 +68,7 @@ struct SessionTests {
         session.recordMiss()
         #expect(session.streak == 0)
         #expect(session.bestStreak == 2)
-        #expect(session.rating == 14)
+        #expect(session.rating == 414)
     }
 
     @Test func カードのスコアは数え上げるまで前の値のまま() async {
@@ -129,11 +129,11 @@ struct SessionTests {
     @Test func 未プレイの旧初期値は10級になり_再起動しても維持する() {
         store.set(1500, forKey: "rating")
         let session = Session(store: store)
-        #expect(session.rating == 0)
+        #expect(session.rating == 400)
         #expect(session.rankName == "10級")
-        #expect(Session(store: store).rating == 0)
+        #expect(Session(store: store).rating == 400)
         session.recordSolve(plies: 1, size: .small, seconds: 0, hintsUsed: 0)
-        #expect(Session(store: store).rating == 12)
+        #expect(Session(store: store).rating == 412)
     }
 
     @Test func 旧開始点だけを一度差し引き_獲得分と成績を引き継ぐ() {
@@ -142,20 +142,22 @@ struct SessionTests {
         store.set(374, forKey: "totalScore")
         store.set(1, forKey: "streak")
         let session = Session(store: store)
-        #expect(session.rating == 12)
+        #expect(session.rating == 412)
         #expect(session.rankName == "10級")
         #expect(session.solvedTotal == 1)
         #expect(session.totalScore == 374)
         #expect(session.streak == 1)
-        #expect(Session(store: store).rating == 12)
+        #expect(Session(store: store).rating == 412)
     }
 
     @Test func 旧レーティングの移行でも0未満にならない() {
-        store.set(1490, forKey: "rating")
+        store.set(1000, forKey: "rating")
         #expect(Session(store: store).rating == 0)
     }
 
     @Test func 十級で間違えてもレーティングは0未満にならない() {
+        store.set(5, forKey: "rating")
+        store.set(true, forKey: "ratingStartsAtTenKyu")
         let session = Session(store: store)
         session.recordMiss()
         #expect(session.rating == 0)
@@ -164,7 +166,7 @@ struct SessionTests {
 
     @Test func 段位の境目と名前() {
         let boundaries: [(rating: Int, name: String)] = [
-            (0, "10級"), (500, "9級"), (600, "8級"), (700, "7級"), (800, "6級"),
+            (400, "10級"), (500, "9級"), (600, "8級"), (700, "7級"), (800, "6級"),
             (900, "5級"), (1000, "4級"), (1100, "3級"), (1200, "2級"), (1300, "1級"),
             (1400, "初段"), (1600, "二段"), (1800, "三段"), (2000, "四段"),
             (2200, "五段"), (2400, "六段"), (2600, "七段"), (2800, "八段"),
@@ -192,10 +194,14 @@ struct SessionTests {
         #expect(fromKyu.rank.name == "初段")
         #expect(fromKyu.fraction == 0.5)
         #expect(fromKyu.remaining == 50)
-        let first = try #require(Session.nextRank(for: 250))
+        let first = try #require(Session.nextRank(for: 450))
         #expect(first.rank.name == "9級")
         #expect(first.fraction == 0.5)
-        #expect(first.remaining == 250)
+        #expect(first.remaining == 50)
+        // 10級の入り口より下がっても、ゲージは空のまま 9級を目指す
+        let below = try #require(Session.nextRank(for: 250))
+        #expect(below.rank.name == "9級")
+        #expect(below.fraction == 0)
         let upper = try #require(Session.nextRank(for: 2700))
         #expect(upper.rank.name == "八段")
         #expect(upper.fraction == 0.5)

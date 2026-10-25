@@ -31,7 +31,8 @@ enum PlayMode: String {
 @MainActor @Observable
 final class Session {
     private let store: UserDefaults
-    private static let initialRating = 0
+    /// はじめのレーティング。10級の入り口で、100 上げると 9級になる（正解 5〜8 問）
+    private static let initialRating = 400
     /// ノーマルでミスした問題。修行モードで解き直す
     let practice: PracticeLibrary
 
@@ -86,9 +87,9 @@ final class Session {
         musicVolume = store.object(forKey: "musicVolume") as? Double ?? 0.6
         tutorialCleared = store.bool(forKey: "tutorialCleared")
         let savedRating = store.object(forKey: "rating") as? Int
-        // 旧版の開始点1500だけを一度差し引き、獲得した分は10級から引き継ぐ。
+        // 旧版の開始点1500を新しい開始点に一度だけ読み替え、獲得した分は10級から引き継ぐ。
         if let savedRating, !store.bool(forKey: "ratingStartsAtTenKyu") {
-            rating = max(Self.initialRating, savedRating - 1500)
+            rating = max(0, savedRating - 1500 + Self.initialRating)
         } else {
             rating = savedRating ?? Self.initialRating
         }
@@ -198,7 +199,7 @@ final class Session {
 
     /// 10級〜八段の18段階。既存の初段〜五段の境界を保ち、段位・ゲージ・昇級段の表示で共有する。
     static let ranks: [Rank] = [
-        Rank(badge: "10級", lowerBound: 0),
+        Rank(badge: "10級", lowerBound: 400),  // はじめのレーティング。間違えてこれより下がっても10級
         Rank(badge: "9級", lowerBound: 500),
         Rank(badge: "8級", lowerBound: 600),
         Rank(badge: "7級", lowerBound: 700),
