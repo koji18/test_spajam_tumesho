@@ -60,7 +60,9 @@ struct TutorialView: View {
             .scrollTargetLayout()
         }
         .scrollPosition(id: $current)
-        .scrollTargetBehavior(.paging)
+        // .paging はスクロールの枠の高さずつ送るが、枠は下の安全領域の分だけ段より高い。
+        // スワイプするたびにずれがたまり、段の上が見切れていくので、段の上端にそろえて止める
+        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollIndicators(.hidden)
         // スクロールの中身は下の安全領域の下にも続くので、はみ出して見える次の段の上端を切り落とす
         .clipped()
