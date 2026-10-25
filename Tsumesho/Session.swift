@@ -39,6 +39,8 @@ final class Session {
     var hapticsOn: Bool { didSet { store.set(hapticsOn, forKey: "hapticsOn") } }
     /// 効果音の音量（0〜1）。0 なら鳴らさない
     var soundVolume: Double { didSet { store.set(soundVolume, forKey: "soundVolume") } }
+    /// BGM の音量（0〜1）。0 なら流さない
+    var musicVolume: Double { didSet { store.set(musicVolume, forKey: "musicVolume") } }
     /// 初回のチュートリアルを詰ませたか。詰ませるまでは普通の見た目で出し、詰ませたらネオンの見た目に切り替える
     var tutorialCleared: Bool { didSet { store.set(tutorialCleared, forKey: "tutorialCleared") } }
 
@@ -80,6 +82,7 @@ final class Session {
         boardSize = BoardSize(rawValue: store.string(forKey: "boardSize") ?? "") ?? .full
         hapticsOn = store.object(forKey: "hapticsOn") as? Bool ?? true
         soundVolume = store.object(forKey: "soundVolume") as? Double ?? 0.8
+        musicVolume = store.object(forKey: "musicVolume") as? Double ?? 0.6
         tutorialCleared = store.bool(forKey: "tutorialCleared")
         rating = store.object(forKey: "rating") as? Int ?? 1500
         streak = store.integer(forKey: "streak")
@@ -89,6 +92,28 @@ final class Session {
         let score = store.integer(forKey: "totalScore")
         totalScore = score
         displayedScore = score
+    }
+
+    /// 設定の「記録をすべて消す」。成績・入門の星・修行の問題・設定を消し、はじめて起動したときと同じにする。
+    /// 普通の見た目に戻り、入門から始まる
+    func resetAll() {
+        scoreRevealID = UUID()
+        mode = .tutorial
+        boardSize = .full
+        hapticsOn = true
+        soundVolume = 0.8
+        musicVolume = 0.6
+        tutorialCleared = false
+        tutorialStars = Array(repeating: 0, count: TutorialStage.all.count)
+        rating = 1500
+        streak = 0
+        bestStreak = 0
+        solvedTotal = 0
+        timeTrialBest = 0
+        totalScore = 0
+        displayedScore = 0
+        scorePopup = nil
+        practice.reset()
     }
 
     /// 正解したとき。連勝と正解数を増やし、レーティングを上げ、スコアを累計に足して、得た点を返す。

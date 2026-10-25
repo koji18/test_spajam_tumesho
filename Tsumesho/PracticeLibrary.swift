@@ -41,6 +41,12 @@ final class PracticeLibrary {
         }
     }
 
+    /// 残した問題を全部消す
+    func reset() {
+        entries = []
+        store.removeObject(forKey: Self.storageKey)
+    }
+
     func problems(size: BoardSize) -> [Problem] {
         entries.filter { $0.problem.size == size }
             .sorted {

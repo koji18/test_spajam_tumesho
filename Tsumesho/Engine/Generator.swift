@@ -4,8 +4,8 @@
 // 攻め駒・玉方の駒・持ち駒をランダムに置き、ソルバーで
 // 「ちょうど N 手で詰む」「正解の初手が一つだけ」「最初から王手になっていない」
 // 局面だけを残す。盤の大きさで作り方を変える。
-//   5×5 用：駒を玉のまわりに置き、5×5 の範囲だけで解けることを確かめる
-//   7×7 用：飛・角・香・龍・馬は 7×7 の範囲のどこからでも利かせ、7×7 の範囲だけで解けて、
+//   5×5 用：駒を玉のまわりに置き、5×5 の盤（範囲の外は壁）で解く
+//   7×7 用：飛・角・香・龍・馬は 7×7 の範囲のどこからでも利かせ、7×7 の盤（範囲の外は壁）で解いて、
 //           5×5 の範囲の外にも駒がある局面だけを残す
 //   9×9 用：飛・角・香・龍・馬は盤のどこからでも利かせ、5×5 の範囲の外にも駒がある局面だけを残す
 
@@ -64,33 +64,28 @@ struct ProblemGenerator {
 
     /// 問題の条件を満たしていれば Problem を返す（id は 0。使う側で振る）
     static func evaluate(_ pos: Position, size: BoardSize, plies: Int) -> Problem? {
+        /// 盤より小さい範囲で遊ぶときは、駒がすべて範囲に入っていて、範囲の外へはどちらの駒も動けない
+        let occupied = pos.board.indices.filter { pos.board[$0] != nil }
+        if !occupied.allSatisfy({ pos.isInWindow($0, span: size.span) }) { return nil }
+        var pos = pos
+        pos.span = size.span
         if pos.inCheck(.white) { return nil }
         if pos.checkMoves().count < 3 { return nil }  // 王手の候補が少なすぎると簡単すぎる
         if plies == 3 && pos.forcesMate(plies: 1) { return nil }  // 早詰め
         let answers = pos.mateMoves(plies: plies)
         guard answers.count == 1 else { return nil }  // 正解の初手は一つだけ
-        let occupied = pos.board.indices.filter { pos.board[$0] != nil }
-        /// 盤より小さい範囲で遊ぶときは、駒がすべて範囲に入り、範囲の中だけで指しても正解が同じ
-        var filter: ((Move) -> Bool)?
-        if size.span < 9 {
-            let span = size.span
-            if !occupied.allSatisfy({ pos.isInWindow($0, span: span) }) { return nil }
-            let window: (Move) -> Bool = { pos.isInWindow($0.to, span: span) }
-            guard pos.mateMoves(plies: plies, where: window) == answers else { return nil }
-            filter = window
-        }
         // 5×5 に収まる問題は 5×5 用に任せ、7×7・9×9 では盤の広さを使う問題だけを残す
         if size != .small && occupied.allSatisfy({ pos.isInWindow($0, span: 5) }) { return nil }
-        if plies == 3 && !hasUniqueLastMove(pos, answers[0], where: filter) { return nil }
+        if plies == 3 && !hasUniqueLastMove(pos, answers[0]) { return nil }
         return Problem(id: 0, size: size, plies: plies, board: pos.sfenBoard, hand: pos.sfenAttackerHand,
                        answer: Notation.label(answers[0], in: pos))
     }
 
     /// 3 手詰めで、玉方がいちばん粘る応手をしたあと、詰ませる最終手も一つだけか
-    private static func hasUniqueLastMove(_ pos: Position, _ first: Move, where filter: ((Move) -> Bool)?) -> Bool {
+    private static func hasUniqueLastMove(_ pos: Position, _ first: Move) -> Bool {
         let next = pos.playing(first)
-        guard let reply = next.bestDefense(plies: 1, where: filter) else { return false }
-        return next.playing(reply).mateMoves(plies: 1, where: filter).count == 1
+        guard let reply = next.bestDefense(plies: 1) else { return false }
+        return next.playing(reply).mateMoves(plies: 1).count == 1
     }
 
     /// 盤の大きさに合わせて駒をランダムに置いた局面を作る。置けなかったり反則の配置になったりしたら nil
@@ -119,7 +114,7 @@ struct ProblemGenerator {
         /// 玉方の駒は玉の左右 2 筋の、5×5・7×7 では三段まで、9×9 では玉の 1 段下まで。
         /// 攻め方の駒は玉の左右 2 筋の、5×5 では五段まで、7×7 では六段まで、9×9 では玉の 3 段下まで。
         /// ただし 7×7・9×9 では、飛・角・香（成った駒も）を表示範囲のどこにでも置く
-        /// 5×5・7×7 では、玉を表示範囲の右上の隅に置く。左端の筋には置かず、3 手詰めで玉が逃げても範囲の外に出ないようにする
+        /// 5×5・7×7 では、玉を表示範囲の右上の隅に置く。左端の筋（盤の端）には置かない
         let kingFile = size == .full ? rng.int(1...9) : rng.int(1...(size.span - 1))
         let kingRank = size == .full ? rng.int(1...3) : rng.int(1...2)
         guard place(Piece(side: .white, kind: .king), files: kingFile...kingFile, ranks: kingRank...kingRank) else { return nil }

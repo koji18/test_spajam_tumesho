@@ -35,6 +35,9 @@ struct Position {
     var board: [Piece?] = Array(repeating: nil, count: 81)  // 添字 = (rank - 1) * 9 + (file - 1)
     var hands: [Side: [Int]] = [.black: Array(repeating: 0, count: 7), .white: Array(repeating: 0, count: 7)]
     var turn: Side = .black
+    /// 盤の一辺。5×5・7×7 では右上の隅（1〜span 筋 × 一〜span 段）だけを盤とし、
+    /// その外へはどちらの駒も動けず、打てない（盤の端と同じ）
+    var span = 9
 }
 
 enum Square {
@@ -44,8 +47,6 @@ enum Square {
     static func file(_ i: Int) -> Int { i % 9 + 1 }
     /// 添字から段（1〜9）を求める
     static func rank(_ i: Int) -> Int { i / 9 + 1 }
-    /// 筋と段が盤の中か
-    static func onBoard(file: Int, rank: Int) -> Bool { (1...9).contains(file) && (1...9).contains(rank) }
 }
 
 // MARK: - 駒の動き（先手から見た向き。dr = -1 が前）
@@ -89,6 +90,9 @@ private let totalPieces = [18, 4, 4, 4, 4, 2, 2]  // 歩 香 桂 銀 金 角 飛
 
 extension Position {
     /// 盤上の駒 from が利いているマス
+    /// 筋と段が、この局面の盤（span × span）の中か
+    func isOnBoard(file: Int, rank: Int) -> Bool { (1...span).contains(file) && (1...span).contains(rank) }
+
     func targets(from: Int) -> [Int] {
         guard let p = board[from] else { return [] }
         let sign = p.side == .black ? 1 : -1
@@ -96,11 +100,11 @@ extension Position {
         var out: [Int] = []
         for d in steps(p) {
             let f = f0 + d.df * sign, r = r0 + d.dr * sign
-            if Square.onBoard(file: f, rank: r) { out.append(Square.index(file: f, rank: r)) }
+            if isOnBoard(file: f, rank: r) { out.append(Square.index(file: f, rank: r)) }
         }
         for d in slides(p) {
             var f = f0 + d.df * sign, r = r0 + d.dr * sign
-            while Square.onBoard(file: f, rank: r) {
+            while isOnBoard(file: f, rank: r) {
                 let i = Square.index(file: f, rank: r)
                 out.append(i)
                 if board[i] != nil { break }
@@ -132,12 +136,12 @@ extension Position {
 
     // MARK: 指し手の生成
 
-    /// rank が side にとっての敵陣（成れる段）か
-    private static func inZone(_ side: Side, _ rank: Int) -> Bool { side == .black ? rank <= 3 : rank >= 7 }
+    /// rank が side にとっての敵陣（成れる段）か。玉方の敵陣は、盤のいちばん下から 3 段
+    func inZone(_ side: Side, _ rank: Int) -> Bool { side == .black ? rank <= 3 : rank > span - 3 }
 
     /// 行き所のない駒になるマスか（歩・香は最終段、桂は最後の 2 段）
-    private static func isDeadEnd(_ kind: Kind, _ side: Side, _ rank: Int) -> Bool {
-        let ahead = side == .black ? rank - 1 : 9 - rank
+    private func isDeadEnd(_ kind: Kind, _ side: Side, _ rank: Int) -> Bool {
+        let ahead = side == .black ? rank - 1 : span - rank
         switch kind {
         case .pawn, .lance: return ahead < 1
         case .knight: return ahead < 2
@@ -160,10 +164,10 @@ extension Position {
             guard let p = board[from], p.side == turn else { continue }
             for to in targets(from: from) {
                 if board[to]?.side == turn { continue }
-                let zone = Self.inZone(turn, Square.rank(from)) || Self.inZone(turn, Square.rank(to))
+                let zone = inZone(turn, Square.rank(from)) || inZone(turn, Square.rank(to))
                 if !p.promoted && p.kind.canPromote && zone {
                     moves.append(Move(from: from, to: to, kind: p.kind, promote: true))
-                    if !Self.isDeadEnd(p.kind, turn, Square.rank(to)) {
+                    if !isDeadEnd(p.kind, turn, Square.rank(to)) {
                         moves.append(Move(from: from, to: to, kind: p.kind))
                     }
                 } else {
@@ -173,8 +177,8 @@ extension Position {
         }
         let hand = hands[turn]!
         for kind in Kind.handKinds where hand[kind.rawValue] > 0 {
-            for to in 0..<81 where board[to] == nil {
-                if Self.isDeadEnd(kind, turn, Square.rank(to)) { continue }
+            for to in 0..<81 where board[to] == nil && isOnBoard(file: Square.file(to), rank: Square.rank(to)) {
+                if isDeadEnd(kind, turn, Square.rank(to)) { continue }
                 if kind == .pawn && hasPawn(onFile: Square.file(to), side: turn) { continue }  // 二歩
                 moves.append(Move(from: nil, to: to, kind: kind))
             }
@@ -216,9 +220,9 @@ extension Position {
     /// 手 m が相手の玉への王手になるか
     func givesCheck(_ m: Move) -> Bool { playing(m).inCheck(turn.opponent) }
 
-    /// 王手になる合法手。filter があれば、それを満たす手だけ
-    func checkMoves(where filter: ((Move) -> Bool)? = nil) -> [Move] {
-        legalMoves().filter { (filter?($0) ?? true) && givesCheck($0) }
+    /// 王手になる合法手
+    func checkMoves() -> [Move] {
+        legalMoves().filter { givesCheck($0) }
     }
 
     var isMate: Bool { inCheck(turn) && legalMoves().isEmpty }
@@ -226,13 +230,13 @@ extension Position {
     // MARK: 詰みの探索
 
     /// plies 手以内に詰ませられる攻め方の初手をすべて返す
-    func mateMoves(plies: Int, where filter: ((Move) -> Bool)? = nil, firstOnly: Bool = false) -> [Move] {
+    func mateMoves(plies: Int, firstOnly: Bool = false) -> [Move] {
         var found: [Move] = []
-        for m in checkMoves(where: filter) {
+        for m in checkMoves() {
             let next = playing(m)
             let replies = next.legalMoves()
             let mates = replies.isEmpty
-                || (plies >= 3 && replies.allSatisfy { next.playing($0).forcesMate(plies: plies - 2, where: filter) })
+                || (plies >= 3 && replies.allSatisfy { next.playing($0).forcesMate(plies: plies - 2) })
             if mates {
                 found.append(m)
                 if firstOnly { break }
@@ -242,16 +246,16 @@ extension Position {
     }
 
     /// 攻め方の手番で、plies 手以内に必ず詰ませられるか
-    func forcesMate(plies: Int, where filter: ((Move) -> Bool)? = nil) -> Bool {
-        !mateMoves(plies: plies, where: filter, firstOnly: true).isEmpty
+    func forcesMate(plies: Int) -> Bool {
+        !mateMoves(plies: plies, firstOnly: true).isEmpty
     }
 
     /// 攻め方の手 check が間違いだったときに、それを防ぐ玉方の応手を 1 つ選ぶ。
     /// 防いだあと plies 手以内に詰ませられない応手のうち、いちばんわかりやすい防ぎ方（Notation.Defense の順）を選ぶ
-    func refutation(of check: Move, plies: Int, where filter: ((Move) -> Bool)? = nil) -> Move? {
+    func refutation(of check: Move, plies: Int) -> Move? {
         let after = playing(check)
         let refuting = after.legalMoves().filter { reply in
-            plies < 1 || !after.playing(reply).forcesMate(plies: plies, where: filter)
+            plies < 1 || !after.playing(reply).forcesMate(plies: plies)
         }
         return refuting.min { a, b in
             Notation.defense(a, after: after, check: check) < Notation.defense(b, after: after, check: check)
@@ -260,15 +264,15 @@ extension Position {
 
     /// 玉方の応手を選ぶ。攻め方の詰ませ方がいちばん少なくなる手を選び、
     /// 同じなら盤上の駒を動かす手を合駒（打つ手）より優先する。
-    func bestDefense(plies: Int, where filter: ((Move) -> Bool)? = nil) -> Move? {
+    func bestDefense(plies: Int) -> Move? {
         legalMoves().min { a, b in
-            score(a, plies, filter) < score(b, plies, filter)
+            score(a, plies) < score(b, plies)
         }
     }
 
     /// 玉方の応手 r の粘り具合。攻め方の詰ませ方が少ないほど小さく、合駒は少し大きくする
-    private func score(_ r: Move, _ plies: Int, _ filter: ((Move) -> Bool)?) -> Int {
-        playing(r).mateMoves(plies: plies, where: filter).count * 2 + (r.from == nil ? 1 : 0)
+    private func score(_ r: Move, _ plies: Int) -> Int {
+        playing(r).mateMoves(plies: plies).count * 2 + (r.from == nil ? 1 : 0)
     }
 
     // MARK: 局面の読み書き
@@ -361,7 +365,7 @@ enum Notation {
         let at = fileLabel(Square.file(m.to)) + rankLabel(Square.rank(m.to))
         guard let from = m.from, let p = pos.board[from] else { return at + names[m.kind]! + "打" }
         let couldPromote = p.kind.canPromote && !p.promoted
-            && (p.side == .black ? min(Square.rank(from), Square.rank(m.to)) <= 3 : max(Square.rank(from), Square.rank(m.to)) >= 7)
+            && (pos.inZone(p.side, Square.rank(from)) || pos.inZone(p.side, Square.rank(m.to)))
         return at + label(p) + (m.promote ? "成" : couldPromote ? "不成" : "")
     }
 

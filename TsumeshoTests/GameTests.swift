@@ -92,8 +92,7 @@ struct GameTests {
         let problem = try #require(generated)
         let game = Game(problem: problem)
         let start = game.position.sfenBoard
-        let inWindow: (Move) -> Bool = { game.position.isInWindow($0.to, span: 5) }
-        let first = try #require(game.position.mateMoves(plies: 3, where: inWindow).first)
+        let first = try #require(game.position.mateMoves(plies: 3).first)
         play(first, in: game)
         #expect(game.status == .thinking)
 
@@ -184,9 +183,7 @@ struct GameTests {
         let generated = generator.next(size: .small, plies: 3, maxPieces: 7)
         let problem = try #require(generated)
         let game = Game(problem: problem)
-        let inWindow: (Move) -> Bool = { game.position.isInWindow($0.to, span: 5) }
-
-        let first = try #require(game.position.mateMoves(plies: 3, where: inWindow).first)
+        let first = try #require(game.position.mateMoves(plies: 3).first)
         play(first, in: game)
         #expect(game.status == .thinking)
         #expect(game.currentPly == 3)
@@ -197,7 +194,7 @@ struct GameTests {
         }
         #expect(game.status == .playing)
 
-        let last = try #require(game.position.mateMoves(plies: 1, where: inWindow).first)
+        let last = try #require(game.position.mateMoves(plies: 1).first)
         play(last, in: game)
         guard case .solved = game.status else {
             Issue.record("最終手で詰んでいない: \(game.status)")

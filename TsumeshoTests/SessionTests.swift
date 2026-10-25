@@ -18,6 +18,30 @@ struct SessionTests {
         #expect(session.soundVolume == 0.8)
     }
 
+    @Test func 記録をすべて消すと_はじめて起動したときに戻る() {
+        let session = Session(store: store)
+        session.recordSolve(plies: 3, size: .small, seconds: 0, hintsUsed: 0)
+        session.recordTimeTrial(solved: 5)
+        session.recordTutorial(stage: 0, stars: 3)
+        session.practice.recordMistake(.tutorial(.small), mode: .normal)
+        session.tutorialCleared = true
+        session.mode = .timeTrial
+        session.musicVolume = 0
+        session.resetAll()
+        // 次に起動したときも、消したままになっている
+        let restarted = Session(store: store)
+        for s in [session, restarted] {
+            #expect(s.rating == 1500)
+            #expect(s.totalScore == 0 && s.displayedScore == 0)
+            #expect(s.streak == 0 && s.bestStreak == 0 && s.solvedTotal == 0 && s.timeTrialBest == 0)
+            #expect(s.tutorialSolved == 0)
+            #expect(s.practice.entries.isEmpty)
+            #expect(!s.tutorialCleared)
+            #expect(s.mode == .tutorial)
+            #expect(s.musicVolume == 0.6)
+        }
+    }
+
     @Test func 正解すると連勝とレーティングとスコアが増える() {
         let session = Session(store: store)
         let gain = session.recordSolve(plies: 1, size: .small, seconds: 0, hintsUsed: 0)
