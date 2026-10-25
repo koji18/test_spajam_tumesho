@@ -166,10 +166,12 @@ struct GameTests {
         #expect(!game.answerShown)
     }
 
-    @Test func ヒントは2段まで_2段目で正解の行き先が光る() {
+    @Test func ヒントは2段まで_1段目は正解の駒だけ_2段目で行き先が光る() {
         let game = Game(problem: tutorial)
         game.showHint()
-        #expect(game.hintHandKinds.contains(.gold))
+        // 盤の歩も王手をかけられるが、正解の持ち駒の金だけを光らせる
+        #expect(game.hintHandKinds == [.gold])
+        #expect(game.hintSources.isEmpty)
         #expect(game.hintTargets.isEmpty)
         game.showHint()
         game.showHint()
