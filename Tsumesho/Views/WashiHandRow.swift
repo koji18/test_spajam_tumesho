@@ -15,8 +15,13 @@ struct WashiHandRow: View {
                 handTile(item)
             }
             Spacer(minLength: 0)
+            // 選んだ持ち駒の動ける範囲
+            if case .hand(let kind) = game.selection {
+                MiniMoveRange(kind: kind, cell: 12)
+                    .environment(\.palette, .classic)
+            }
         }
-        .frame(minHeight: 52)
+        .frame(minHeight: 66)
     }
 
     private func handTile(_ item: Game.HandItem) -> some View {

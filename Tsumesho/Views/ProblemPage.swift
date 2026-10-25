@@ -204,8 +204,14 @@ struct ProblemPage: View {
                     .accessibilityHidden(!isHandSelected)
             }
             Spacer(minLength: 0)
+            // 選んだ持ち駒の動ける範囲。場所は取らず、出入りで盤が縮まないようにする
+            if case .hand(let kind) = game.selection {
+                MiniMoveRange(kind: kind, cell: layout.compact ? 12 : 15)
+                    .transition(.opacity)
+            }
         }
         .frame(minHeight: layout.handRowHeight)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: game.selection)
     }
 
     /// 持ち駒の 1 枚ぶんのタイル
