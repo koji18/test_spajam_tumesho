@@ -117,7 +117,7 @@ final class Game {
 
     // MARK: ヒント
 
-    /// 1 回目：王手をかけられる駒を光らせる。2 回目：正解の駒と行き先だけを光らせる
+    /// 1 回目：正解の駒だけを光らせる。2 回目：その行き先も光らせる
     /// ページが表示されたら呼ぶ。2 回目以降は何もしない
     func start() {
         if startedAt == nil { startedAt = Date() }
@@ -134,16 +134,12 @@ final class Game {
     /// ヒントの段階に合わせて、光らせるマスと持ち駒を計算し直す
     private func refreshHints() {
         switch hintLevel {
-        case 1:
-            let checks = position.checkMoves()
-            hintSources = Set(checks.compactMap(\.from))
-            hintHandKinds = Set(checks.filter { $0.from == nil }.map(\.kind))
-            hintTargets = []
-        case 2:
+        case 1, 2:
+            // 1 段目は正解の駒だけ、2 段目はその行き先も光らせる
             let answers = position.mateMoves(plies: pliesLeft)
             hintSources = Set(answers.compactMap(\.from))
             hintHandKinds = Set(answers.filter { $0.from == nil }.map(\.kind))
-            hintTargets = Set(answers.map(\.to))
+            hintTargets = hintLevel == 2 ? Set(answers.map(\.to)) : []
         default:
             hintSources = []
             hintHandKinds = []
